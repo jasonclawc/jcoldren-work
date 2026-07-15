@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coach Mode v5 — Client Football 101</title>
+<!-- Barlow Condensed ≈ Shentox Bold | Inter ≈ Proxima Nova — directional Client prototype fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Inter:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- YouTube IFrame API — enables inline video + error detection -->
+<script src="https://www.youtube.com/iframe_api"></script>
+<style>
+:root{
+  --navy:#0b1c2e; --navy-mid:#122540; --navy-light:#1a3558;
+  --grass:#1c4230; --chalk:#f0ede4; --chalk-dim:#8a9aaa;
+  /* Client brand tokens */
+  --orange:#0070EB;   /* Client blue — interactive accents */
+  --gold:#FFDC2E;     /* Client yellow — scores, XP, decorative */
+  --green:#1BB152;    /* Client green — wins, CTAs */
+  --red:#D22839;      /* Client red — errors, losses */
+  --flag-red:#D22839;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;background:var(--navy);color:var(--chalk);font-family:'Inter',sans-serif;overflow:hidden;}
+
+/* ── APP SHELL ── */
+#app{display:grid;grid-template-rows:auto auto 1fr auto;height:100vh;visibility:hidden;}
+
+/* ── TOP BAR ── */
+#topbar{background:var(--navy-mid);border-bottom:2px solid rgba(255,255,255,.07);padding:9px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.brand{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;white-space:nowrap;}
+.brand em{color:var(--orange);font-style:normal;}
+.phase-lbl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--chalk-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.yards-display{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--gold);white-space:nowrap;}
+#flagBtn{display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--flag-red);border-radius:6px;color:var(--flag-red);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:5px 9px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+#flagBtn:hover:not(:disabled){background:rgba(204,34,0,.12);}
+#flagBtn:disabled{opacity:.22;cursor:default;border-color:#334;color:#334;}
+
+/* ── FIELD STRIP ── */
+#fieldStrip{background:var(--grass);padding:11px 16px 8px;position:relative;overflow:hidden;flex-shrink:0;}
+#fieldStrip::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0%,transparent calc(10% - 1px),rgba(0,0,0,.12) calc(10% - 1px),rgba(0,0,0,.12) 10%);pointer-events:none;}
+.yard-labels{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;color:rgba(255,255,255,.28);margin-bottom:5px;position:relative;z-index:1;}
+.yard-track{height:28px;background:rgba(0,0,0,.32);border-radius:4px;position:relative;overflow:hidden;z-index:1;}
+#yardFill{height:100%;background:linear-gradient(90deg,#0f3d1e,#1BB152);border-radius:4px;transition:width .8s cubic-bezier(.34,1.4,.64,1);position:relative;min-width:24px;}
+#yardFill::after{content:'🏈';position:absolute;right:-4px;top:50%;transform:translateY(-50%);font-size:18px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));}
+#penaltyFlash{position:absolute;inset:0;background:rgba(204,34,0,.35);border-radius:4px;opacity:0;pointer-events:none;z-index:2;transition:opacity .2s;}
+.field-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:6px;position:relative;z-index:1;}
+.down-pips{display:flex;gap:5px;align-items:center;}
+.pip{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.18);background:rgba(0,0,0,.2);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:9px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.22);transition:all .3s;}
+.pip.active{background:var(--orange);border-color:var(--orange);color:#fff;box-shadow:0 0 8px rgba(0,112,235,.45);}
+.pip.used{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.09);}
+.down-text{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;color:var(--chalk);margin-left:7px;}
+.down-text em{color:var(--gold);font-style:normal;}
+#clockWrap{display:flex;align-items:center;gap:6px;}
+#clockRing{width:34px;height:34px;flex-shrink:0;}
+#clockNum{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;color:var(--chalk);}
+
+/* ── SCROLLABLE CONTENT ── */
+#content{overflow-y:auto;padding:16px 20px 10px;display:flex;flex-direction:column;gap:0;}
+
+/* commentary strip */
+#commentary{background:var(--navy-light);border-left:3px solid var(--orange);border-radius:0 7px 7px 0;padding:8px 13px;margin-bottom:14px;font-size:13px;font-style:italic;color:var(--chalk-dim);display:flex;align-items:center;gap:7px;flex-shrink:0;transition:border-color .3s,background .3s;}
+#commentary.win-c{border-color:var(--green);background:rgba(27,177,82,.1);}
+#commentary.lose-c{border-color:var(--red);background:rgba(210,40,57,.1);}
+
+/* ── PLAY SLIDE ── */
+.play-eyebrow{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--orange);margin-bottom:6px;}
+.play-question{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(16px,2.8vw,22px);line-height:1.25;color:var(--chalk);margin-bottom:12px;}
+
+/* video section */
+.video-section{margin-bottom:14px;}
+.watch-prompt{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.watch-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--chalk-dim);}
+.nfl-badge{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:var(--chalk-dim);}
+
+/* ── VIDEO MODAL ── */
+#videoModal{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .25s;}
+#videoModal.show{opacity:1;pointer-events:auto;}
+.modal-inner{width:100%;max-width:860px;display:flex;flex-direction:column;gap:12px;}
+.modal-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.modal-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--chalk-dim);}
+.modal-close{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;padding:8px 16px;background:transparent;border:1px solid rgba(255,255,255,.2);border-radius:7px;color:var(--chalk-dim);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.modal-close:hover{background:rgba(255,255,255,.08);color:var(--chalk);}
+.modal-video{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;}
+.modal-video iframe{position:absolute;inset:0;width:100%;height:100%;border:none;}
+.modal-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.modal-footer-hint{font-size:12px;color:var(--chalk-dim);font-family:'DM Mono',monospace;letter-spacing:1px;}
+.modal-done-btn{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;padding:10px 22px;background:var(--green);color:#fff;border:none;border-radius:8px;cursor:pointer;transition:all .2s;opacity:.4;pointer-events:none;}
+.modal-done-btn.active{opacity:1;pointer-events:auto;}
+.modal-done-btn.active:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(27,177,82,.4);}
+
+/* clip launcher card */
+.clip-card{width:100%;max-width:680px;background:var(--navy-mid);border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden;}
+
+/* inline embed — responsive 16:9 */
+.embed-wrap{position:relative;width:100%;padding-bottom:56.25%;background:#000;overflow:hidden;}
+.embed-wrap>div,.embed-wrap iframe{position:absolute;top:0;left:0;width:100%!important;height:100%!important;border:none;}
+
+/* fallback — shown when YouTube blocks embedding */
+.clip-fallback{display:none;position:relative;width:100%;aspect-ratio:16/9;background:#000;cursor:pointer;overflow:hidden;}
+.clip-play-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;}
+.clip-play-btn{width:64px;height:64px;background:rgba(27,177,82,.92);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .2s;}
+.clip-fallback:hover .clip-play-btn{transform:scale(1.08);}
+.clip-play-icon{font-size:26px;margin-left:4px;}
+.clip-title-overlay{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.75);background:rgba(0,0,0,.5);padding:4px 10px;border-radius:20px;}
+.clip-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:10px;border-top:1px solid rgba(255,255,255,.07);}
+.clip-footer-label{font-size:12px;color:var(--chalk-dim);}
+.clip-footer-label strong{color:var(--chalk);}
+.done-watching-btn{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:8px 16px;background:#334;color:#667;border:none;border-radius:7px;cursor:default;transition:all .2s;}
+.done-watching-btn.ready{background:var(--green);color:#fff;cursor:pointer;}
+.done-watching-btn.ready:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(27,177,82,.35);}
+
+/* clock-waiting state */
+.clock-waiting{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--chalk-dim);font-family:'DM Mono',monospace;letter-spacing:1px;padding:6px 0;margin-bottom:10px;}
+.clock-waiting .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 1.2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+
+/* options */
+.options{display:flex;flex-direction:column;gap:8px;max-width:680px;}
+.opt{background:var(--navy-light);border:2px solid rgba(255,255,255,.1);border-radius:9px;padding:12px 15px;color:var(--chalk);font-family:'Inter',sans-serif;font-size:clamp(13px,1.6vw,15px);line-height:1.45;cursor:pointer;text-align:left;transition:all .18s;display:flex;align-items:flex-start;gap:9px;}
+.opt:hover:not(:disabled){border-color:var(--orange);background:rgba(0,112,235,.1);transform:translateX(3px);}
+.opt:disabled{cursor:default;}
+.opt.correct{border-color:var(--green);background:rgba(27,177,82,.14);color:#7dcea0;}
+.opt.wrong{border-color:var(--red);background:rgba(210,40,57,.14);color:#f1948a;}
+.opt.reveal{border-color:var(--green);background:rgba(27,177,82,.07);color:#7dcea0;}
+.opt.elim{opacity:.26;text-decoration:line-through;}
+.opt-letter{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--orange);flex-shrink:0;margin-top:1px;}
+
+/* options locked before video */
+.opts-locked{pointer-events:none;opacity:.38;position:relative;}
+.opts-locked::after{content:'Watch the clip first';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--chalk-dim);background:rgba(11,28,46,.6);border-radius:9px;}
+
+/* reveal panel */
+.reveal-panel{background:var(--navy-mid);border:1px solid rgba(255,220,46,.2);border-radius:9px;padding:14px 18px;margin-top:12px;max-width:680px;display:none;}
+.reveal-panel.show{display:block;animation:fadeSlide .35s both;}
+.reveal-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--gold);margin-bottom:4px;}
+.reveal-body{font-size:13px;line-height:1.75;color:var(--chalk-dim);}
+.reveal-body strong{color:var(--chalk);}
+
+/* ── TEACH SLIDES ── */
+.teach-icon{font-size:34px;margin-bottom:9px;}
+.teach-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(19px,3.2vw,30px);letter-spacing:-.5px;margin-bottom:8px;}
+.teach-title em{color:var(--orange);font-style:normal;}
+.teach-body{font-size:clamp(13px,1.6vw,15px);line-height:1.8;color:var(--chalk-dim);max-width:660px;margin-bottom:16px;}
+.teach-body strong{color:var(--chalk);}.teach-body em{color:var(--gold);font-style:italic;}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px;max-width:660px;margin-bottom:12px;}
+.pos-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:13px 15px;animation:fadeSlide .4s both;}
+.pos-card:nth-child(1){animation-delay:.05s}.pos-card:nth-child(2){animation-delay:.12s}.pos-card:nth-child(3){animation-delay:.19s}.pos-card:nth-child(4){animation-delay:.26s}
+.pos-abbr{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;color:var(--gold);}
+.pos-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--chalk-dim);margin:2px 0 6px;}
+.pos-desc{font-size:12px;line-height:1.6;color:var(--chalk-dim);}
+.pos-desc strong{color:var(--chalk);}
+.score-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px;max-width:660px;margin-bottom:12px;}
+.score-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:13px;text-align:center;animation:fadeSlide .4s both;}
+.score-card:nth-child(1){animation-delay:.05s}.score-card:nth-child(2){animation-delay:.12s}.score-card:nth-child(3){animation-delay:.19s}.score-card:nth-child(4){animation-delay:.26s}.score-card:nth-child(5){animation-delay:.33s}
+.score-pts{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:34px;color:var(--gold);line-height:1;}
+.score-pts small{font-size:13px;color:var(--chalk-dim);}
+.score-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--orange);margin:4px 0 4px;}
+.score-note{font-size:11px;color:var(--chalk-dim);line-height:1.5;}
+.downs-exp{background:rgba(255,255,255,.04);border-radius:9px;padding:16px 18px;max-width:540px;margin-bottom:12px;}
+.de-row{display:flex;align-items:center;gap:11px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
+.de-row:last-child{border:none;}
+.de-down{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;color:var(--gold);min-width:70px;white-space:nowrap;}
+.callout{display:flex;gap:10px;background:rgba(0,112,235,.08);border-left:3px solid var(--orange);border-radius:0 7px 7px 0;padding:10px 13px;font-size:12px;line-height:1.65;color:var(--chalk-dim);max-width:660px;margin-bottom:8px;}
+.callout strong{color:var(--chalk);}
+.callout-icon{flex-shrink:0;font-size:15px;margin-top:1px;}
+.field-svg-wrap{background:var(--grass);border-radius:9px;padding:13px;border:1px solid rgba(255,255,255,.07);margin-bottom:12px;overflow:hidden;}
+.act-div{display:flex;align-items:center;gap:11px;margin-bottom:16px;}
+.act-div-line{flex:1;height:1px;background:rgba(255,255,255,.07);}
+.act-div-text{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--orange);white-space:nowrap;}
+
+/* ── BOTTOM BAR ── */
+#bottombar{background:rgba(11,28,46,.97);border-top:1px solid rgba(255,255,255,.07);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;backdrop-filter:blur(8px);}
+.nav-btn{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:9px 18px;border-radius:7px;border:none;cursor:pointer;transition:all .18s;}
+.nav-btn:hover:not(:disabled){transform:translateY(-1px);}
+.nav-btn:active:not(:disabled){transform:translateY(0);}
+.nav-next{background:var(--orange);color:#fff;}
+.nav-next:disabled{background:#1e3350;color:#3a5570;cursor:default;transform:none;}
+.nav-back{background:transparent;color:var(--chalk-dim);border:1px solid rgba(255,255,255,.12);}
+.nav-back:disabled{opacity:.2;cursor:default;}
+#slide-counter{font-family:'DM Mono',monospace;font-size:10px;color:var(--chalk-dim);letter-spacing:2px;white-space:nowrap;}
+
+/* ── TITLE SCREEN ── */
+#titleScreen{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:32px 20px 80px;z-index:50;overflow-y:auto;}
+#titleScreen.hidden{display:none;}
+#titleScreen::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(90deg,transparent 0%,transparent calc(10% - 1px),rgba(255,255,255,.022) calc(10% - 1px),rgba(255,255,255,.022) 10%);pointer-events:none;}
+.ts-inner{display:flex;flex-direction:column;align-items:center;text-align:center;max-width:580px;width:100%;position:relative;}
+.ts-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--orange);margin-bottom:11px;animation:fadeSlide .6s .1s both;}
+.ts-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(44px,9vw,84px);line-height:1;letter-spacing:-2px;margin-bottom:11px;animation:fadeSlide .6s .25s both;}
+.ts-title em{color:var(--orange);font-style:normal;}
+.ts-sub{font-size:clamp(13px,1.7vw,16px);line-height:1.75;color:var(--chalk-dim);max-width:460px;margin-bottom:22px;animation:fadeSlide .6s .4s both;}
+.mpills{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:22px;animation:fadeSlide .5s .5s both;}
+.mpill{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:4px 12px;font-size:10px;font-family:'DM Mono',monospace;letter-spacing:1px;color:var(--chalk-dim);}
+.ts-btn{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:14px 34px;background:var(--orange);color:#fff;border:none;border-radius:9px;cursor:pointer;transition:all .2s;animation:fadeSlide .6s .55s both;margin-bottom:28px;}
+.ts-btn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(27,177,82,.32);}
+
+/* setup panel */
+#setupPanel{background:var(--navy-mid);border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:18px 20px;width:100%;margin-bottom:20px;animation:fadeSlide .4s both;}
+.setup-header{margin-bottom:4px;}
+.setup-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--gold);}
+.setup-sub{font-size:11px;color:var(--chalk-dim);line-height:1.5;margin-bottom:12px;}
+.setup-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--chalk-dim);background:none;border:none;padding:0;margin-bottom:12px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;}
+.setup-toggle:hover{color:var(--chalk);}
+.setup-toggle-arrow{transition:transform .2s;display:inline-block;}
+.setup-toggle-arrow.open{transform:rotate(90deg);}
+#setupRows{display:none;}
+#setupRows.open{display:block;}
+.setup-row{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+.setup-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--chalk-dim);min-width:110px;flex-shrink:0;}
+.setup-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:5px;color:var(--chalk);font-family:'Inter',sans-serif;font-size:12px;padding:6px 9px;outline:none;transition:border-color .2s;}
+.setup-input:focus{border-color:var(--orange);}
+.setup-input::placeholder{color:rgba(255,255,255,.22);}
+.setup-save{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:7px 16px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;transition:.2s;margin-top:4px;}
+.setup-save:hover{opacity:.88;}
+.setup-saved{font-family:'DM Mono',monospace;font-size:10px;color:var(--green);display:none;margin-left:8px;}
+
+/* ── END SCREEN ── */
+#endScreen{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 20px 80px;z-index:50;overflow-y:auto;}
+#endScreen.hidden{display:none;}
+#endScreen::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(90deg,transparent 0%,transparent calc(10% - 1px),rgba(255,255,255,.022) calc(10% - 1px),rgba(255,255,255,.022) 10%);pointer-events:none;}
+.end-trophy{font-size:64px;margin-bottom:9px;position:relative;animation:pop .6s .1s both;}
+.end-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(36px,7vw,70px);line-height:1;letter-spacing:-1px;position:relative;animation:fadeSlide .6s .2s both;}
+.end-title em{color:var(--orange);font-style:normal;}
+.end-sub{font-size:clamp(13px,1.7vw,15px);line-height:1.75;color:var(--chalk-dim);max-width:460px;margin:9px auto 18px;position:relative;animation:fadeSlide .6s .35s both;}
+.end-stats{display:flex;gap:14px;justify-content:center;margin-bottom:18px;position:relative;animation:fadeSlide .6s .45s both;}
+.stat-box{background:rgba(255,255,255,.05);border-radius:8px;padding:11px 16px;text-align:center;min-width:76px;}
+.stat-num{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;color:var(--gold);}
+.stat-lbl{font-size:10px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;color:var(--chalk-dim);margin-top:2px;}
+.end-glossary{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;text-align:left;max-width:600px;width:100%;margin:0 auto 20px;position:relative;animation:fadeSlide .5s .5s both;}
+.gl-item{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:8px 11px;}
+.gl-term{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;color:var(--gold);margin-bottom:2px;}
+.gl-def{font-size:11px;color:var(--chalk-dim);line-height:1.5;}
+
+/* ── PENALTY OVERLAY ── */
+#penaltyOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:80;opacity:0;pointer-events:none;transition:opacity .3s;}
+#penaltyOverlay.show{opacity:1;pointer-events:auto;}
+.penalty-box{background:var(--navy-mid);border:2px solid var(--flag-red);border-radius:13px;padding:26px 32px;text-align:center;max-width:360px;animation:pop .4s both;}
+.penalty-icon{font-size:44px;margin-bottom:7px;}
+.penalty-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:24px;color:#ff6b5b;margin-bottom:4px;}
+.penalty-body{font-size:13px;line-height:1.65;color:var(--chalk-dim);margin-bottom:16px;}
+.penalty-body strong{color:var(--chalk);}
+.penalty-dismiss{background:var(--orange);color:#fff;border:none;border-radius:7px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:1px;padding:9px 24px;cursor:pointer;}
+
+/* ── CONFETTI ── */
+.confetti-p{position:fixed;pointer-events:none;z-index:200;animation:cfall linear forwards;border-radius:2px;}
+@keyframes cfall{0%{transform:translateY(-20px) rotate(0deg);opacity:1;}100%{transform:translateY(110vh) rotate(800deg);opacity:0;}}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeSlide{from{opacity:0;transform:translateY(13px);}to{opacity:1;transform:translateY(0);}}
+@keyframes pop{0%{transform:scale(.7);opacity:0;}70%{transform:scale(1.05);}100%{transform:scale(1);opacity:1;}}
+
+/* ══════════════════════════════════════
+   CLIENT BRAND OVERRIDES
+   Rough directional mockup — Client design patterns
+   Primary CTA: #1BB152 green | Accent: #0070EB blue | Decorative: #FFDC2E yellow
+══════════════════════════════════════ */
+
+/* CTAs always Client green */
+.ts-btn,.nav-next,.setup-save,.penalty-dismiss,.levelup-dismiss{background:#1BB152!important;color:#fff!important;}
+.ts-btn:hover{box-shadow:0 8px 22px rgba(27,177,82,.32)!important;}
+.nav-next:disabled{background:#1e3350!important;color:#3a5570!important;}
+.done-watching-btn.ready:hover{box-shadow:0 4px 12px rgba(27,177,82,.35)!important;}
+.modal-done-btn.active:hover{box-shadow:0 4px 14px rgba(27,177,82,.4)!important;}
+.levelup-dismiss:hover{box-shadow:0 4px 14px rgba(27,177,82,.4)!important;}
+
+/* Clip play button is a CTA — green */
+.clip-play-btn{background:rgba(27,177,82,.92)!important;}
+
+/* Option hover — Client blue tint */
+.opt:hover:not(:disabled){border-color:#0070EB!important;background:rgba(0,112,235,.1)!important;}
+
+/* Answer state colors */
+.opt.correct{border-color:#1BB152!important;background:rgba(27,177,82,.14)!important;}
+.opt.reveal {border-color:#1BB152!important;background:rgba(27,177,82,.07)!important;}
+.opt.wrong  {border-color:#D22839!important;background:rgba(210,40,57,.14)!important;}
+
+/* Callout — blue tint */
+.callout{background:rgba(0,112,235,.08)!important;border-left-color:#0070EB!important;}
+
+/* Pip active — blue glow */
+.pip.active{box-shadow:0 0 8px rgba(0,112,235,.45)!important;}
+
+/* Commentary win/lose */
+#commentary.win-c {border-color:#1BB152!important;background:rgba(27,177,82,.1)!important;}
+#commentary.lose-c{border-color:#D22839!important;background:rgba(210,40,57,.1)!important;}
+
+/* Reveal panel gold → yellow */
+.reveal-panel{border-color:rgba(255,220,46,.2)!important;}
+
+/* TD celebration */
+.td-card{box-shadow:0 0 60px rgba(255,220,46,.35),0 0 120px rgba(0,112,235,.15)!important;}
+
+/* Yard fill — updated green gradient */
+#yardFill{background:linear-gradient(90deg,#0f3d1e,#1BB152)!important;}
+
+/* Barlow Condensed needs explicit 800 weight everywhere it replaces Archivo Black */
+.brand,.ts-title,.ts-btn,.ts-label,.nav-btn,.play-question,.teach-title,
+.opt-letter,.down-text,.stat-num,.pos-abbr,.score-pts,.score-name,.penalty-title,
+.reveal-title,.end-title,.td-headline,.levelup-rank,.gl-term,.rank-badge,
+.yards-display,.nfl-badge,.watch-label,.act-div-text,.end-trophy{font-weight:800;}
+
+/* ── XP / RANK (topbar) ── */
+.xp-wrap{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.rank-badge{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.15);color:var(--gold);white-space:nowrap;transition:color .5s,border-color .5s;}
+.xp-mini-bar{width:52px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;flex-shrink:0;}
+.xp-mini-fill{height:100%;background:var(--gold);border-radius:2px;transition:width .7s ease;}
+
+/* ── CROWD ENERGY METER ── */
+#crowdMeter{margin:7px 0 2px;position:relative;z-index:1;}
+.crowd-header{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.32);margin-bottom:3px;}
+.crowd-track{height:5px;background:rgba(0,0,0,.35);border-radius:3px;overflow:hidden;}
+#crowdFill{height:100%;width:0%;background:var(--orange);border-radius:3px;transition:width .7s cubic-bezier(.34,1.2,.64,1),background .5s;}
+
+/* ── BROADCAST LOWER THIRD ── */
+#lowerThird{position:fixed;bottom:68px;left:50%;transform:translateX(-50%) translateY(18px);z-index:100;pointer-events:none;opacity:0;transition:opacity .25s,transform .3s cubic-bezier(.34,1.2,.64,1);}
+#lowerThird.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.lt-inner{background:rgba(8,20,38,.96);border-left:4px solid var(--orange);padding:9px 20px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--chalk);box-shadow:0 6px 24px rgba(0,0,0,.55);border-radius:0 7px 7px 0;white-space:nowrap;}
+
+/* ── TOUCHDOWN CELEBRATION ── */
+#tdOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:150;pointer-events:none;opacity:0;transition:opacity .3s;}
+#tdOverlay.show{opacity:1;}
+.td-card{background:linear-gradient(135deg,#0b1c2e,#1a3558);border:3px solid var(--gold);border-radius:16px;padding:26px 48px;text-align:center;box-shadow:0 0 60px rgba(255,220,46,.35),0 0 120px rgba(0,112,235,.15);animation:tdPop .55s cubic-bezier(.34,1.4,.64,1) both;}
+@keyframes tdPop{from{transform:scale(.45) rotate(-6deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
+.td-emoji{font-size:60px;display:block;margin-bottom:6px;}
+.td-headline{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:42px;color:var(--gold);letter-spacing:-1px;line-height:1;}
+.td-pts{font-family:'DM Mono',monospace;font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--orange);margin-top:8px;}
+.td-xp{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,220,46,.6);margin-top:4px;}
+
+/* ── WHITE FLASH ── */
+#flashOverlay{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:140;}
+@keyframes whiteFlash{0%{opacity:.8;}100%{opacity:0;}}
+#flashOverlay.flash{animation:whiteFlash .45s ease-out forwards;}
+
+/* ── LEVEL UP OVERLAY ── */
+#levelUpOverlay{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:160;opacity:0;pointer-events:none;transition:opacity .3s;}
+#levelUpOverlay.show{opacity:1;pointer-events:auto;}
+.levelup-card{background:var(--navy-mid);border:2px solid var(--gold);border-radius:16px;padding:34px 50px;text-align:center;max-width:340px;animation:pop .5s both;}
+.levelup-icon{font-size:56px;display:block;margin-bottom:8px;}
+.levelup-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--chalk-dim);margin-bottom:6px;}
+.levelup-rank{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:40px;color:var(--gold);line-height:1;}
+.levelup-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--chalk-dim);margin-top:8px;line-height:1.5;}
+.levelup-dismiss{margin-top:20px;background:var(--orange);color:#fff;border:none;border-radius:7px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:1px;padding:10px 26px;cursor:pointer;transition:.2s;}
+.levelup-dismiss:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(27,177,82,.4);}
+</style>
+</head>
+<body>
+
+<!-- ══ TITLE SCREEN ══ -->
+<div id="titleScreen">
+ <div class="ts-inner">
+  <div class="ts-label">Client Training · Football 101</div>
+  <h1 class="ts-title">Coach <em>Mode</em></h1>
+  <p class="ts-sub">Watch real plays, make the call, and drive your team down the field. No football experience needed.</p>
+  <div class="mpills">
+    <div class="mpill">▶ Real NFL Clips</div>
+    <div class="mpill">🏈 Live Field</div>
+    <div class="mpill">⏱ Play Clock</div>
+    <div class="mpill">🚩 Challenge Flag</div>
+  </div>
+
+  <div id="setupPanel">
+    <div class="setup-header"><div class="setup-title">📋 Facilitator Setup <span style="font-family:'Inter',sans-serif;font-weight:400;font-size:11px;color:var(--chalk-dim)">(optional)</span></div></div>
+    <div class="setup-sub">All 8 plays have NFL clips ready to go. Want to swap one out? Paste a custom YouTube URL below.</div>
+    <button class="setup-toggle" onclick="toggleSetup()">
+      <span class="setup-toggle-arrow" id="setupArrow">▶</span>
+      <span id="setupToggleText">Swap a clip</span>
+    </button>
+    <div id="setupRows">
+      <div class="setup-row"><span class="setup-label">Play 1 · Snap</span><input class="setup-input" id="url0" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 2 · Handoff</span><input class="setup-input" id="url1" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 3 · Incomplete</span><input class="setup-input" id="url2" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 4 · 1st Down</span><input class="setup-input" id="url3" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 5 · Touchdown</span><input class="setup-input" id="url4" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 6 · 4th Down</span><input class="setup-input" id="url5" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 7 · Sack</span><input class="setup-input" id="url6" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="setup-row"><span class="setup-label">Play 8 · Safety</span><input class="setup-input" id="url7" placeholder="https://youtube.com/watch?v=..."></div>
+      <div style="display:flex;align-items:center;">
+        <button class="setup-save" onclick="saveUrls()">Save</button>
+        <span class="setup-saved" id="setupSaved">✓ Saved!</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="ts-btn" onclick="startGame()">Kick Off →</button>
+ </div>
+</div>
+
+<!-- ══ END SCREEN ══ -->
+<div id="endScreen" class="hidden">
+  <div class="end-trophy" id="endTrophy">🏆</div>
+  <h2 class="end-title" id="endTitle">Drive <em>Complete!</em></h2>
+  <p class="end-sub" id="endSub"></p>
+  <div class="end-stats">
+    <div class="stat-box"><div class="stat-num" id="statCorrect">0</div><div class="stat-lbl">Correct</div></div>
+    <div class="stat-box"><div class="stat-num" id="statYards">0</div><div class="stat-lbl">Yards</div></div>
+    <div class="stat-box"><div class="stat-num" id="statTD" style="color:var(--orange)">0</div><div class="stat-lbl">TDs</div></div>
+    <div class="stat-box"><div class="stat-num" id="statXP" style="color:var(--gold)">0</div><div class="stat-lbl">XP Earned</div></div>
+  </div>
+  <div id="endRankWrap" style="margin-bottom:16px;animation:fadeSlide .5s .5s both;display:none;width:100%;max-width:340px;">
+    <div id="endRankLabel" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--chalk-dim);margin-bottom:6px;text-align:center;"></div>
+    <div style="height:8px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;">
+      <div id="endRankFill" style="height:100%;background:var(--gold);border-radius:4px;width:0%;transition:width 1.1s ease .7s;"></div>
+    </div>
+    <div id="endRankNext" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--chalk-dim);margin-top:5px;text-align:right;"></div>
+  </div>
+  <div class="end-glossary" id="endGlossary"></div>
+  <button class="ts-btn" style="animation:none;" onclick="restartGame()">Play Again →</button>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="app">
+  <div id="topbar">
+    <div class="brand">Coach <em>Mode</em></div>
+    <div class="phase-lbl" id="phaseLbl">—</div>
+    <div class="yards-display" id="yardsDisplay">0 yds</div>
+    <div class="xp-wrap" id="xpWrap">
+      <span class="rank-badge" id="rankBadge">🥉 ROOKIE</span>
+      <div class="xp-mini-bar"><div class="xp-mini-fill" id="xpMiniFill" style="width:0%"></div></div>
+    </div>
+    <button id="flagBtn" onclick="useChallenge()" title="Challenge Flag — eliminate one wrong answer">
+      <span>🚩</span> Challenge
+    </button>
+  </div>
+
+  <div id="fieldStrip">
+    <div class="yard-labels">
+      <span>0</span><span>10</span><span>20</span><span>30</span><span>40</span>
+      <span>50</span><span>40</span><span>30</span><span>20</span><span>10</span>
+      <span style="color:var(--gold);font-weight:700">TD</span>
+    </div>
+    <div class="yard-track">
+      <div id="yardFill" style="width:0%"></div>
+      <div id="penaltyFlash"></div>
+    </div>
+    <div id="crowdMeter">
+      <div class="crowd-header"><span>📣 Crowd Energy</span><span id="crowdPct">0%</span></div>
+      <div class="crowd-track"><div id="crowdFill"></div></div>
+    </div>
+    <div class="field-bottom">
+      <div style="display:flex;align-items:center;gap:5px;">
+        <div class="down-pips" id="downPips"></div>
+        <div class="down-text" id="downText"></div>
+      </div>
+      <div id="clockWrap">
+        <svg id="clockRing" viewBox="0 0 34 34">
+          <circle cx="17" cy="17" r="12" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/>
+          <circle id="clockArc" cx="17" cy="17" r="12" fill="none" stroke="#0070EB" stroke-width="4"
+            stroke-linecap="round" stroke-dasharray="75.4" stroke-dashoffset="0"
+            transform="rotate(-90 17 17)"/>
+        </svg>
+        <span id="clockNum">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="content">
+    <div id="commentary"><span>📻</span><span id="commentText">Welcome to Coach Mode.</span></div>
+    <div id="slideContent"></div>
+  </div>
+
+  <div id="bottombar">
+    <button class="nav-btn nav-back" id="backBtn" onclick="prevSlide()" disabled>← Back</button>
+    <span id="slide-counter">—</span>
+    <button class="nav-btn nav-next" id="nextBtn" onclick="nextSlide()">Next →</button>
+  </div>
+</div>
+
+<!-- ══ PENALTY OVERLAY ══ -->
+<div id="penaltyOverlay">
+  <div class="penalty-box">
+    <div class="penalty-icon">🟡</div>
+    <div class="penalty-title">Delay of game!</div>
+    <div class="penalty-body"><strong>5-yard penalty.</strong> The clock ran out before you made a call. It happens — now you know.</div>
+    <button class="penalty-dismiss" onclick="dismissPenalty()">Got it — keep going</button>
+  </div>
+</div>
+
+<!-- ══ TOUCHDOWN CELEBRATION ══ -->
+<div id="tdOverlay">
+  <div class="td-card">
+    <span class="td-emoji">🏈</span>
+    <div class="td-headline">TOUCHDOWN!</div>
+    <div class="td-pts">6 POINTS · DRIVE COMPLETE</div>
+    <div class="td-xp" id="tdXpLine">+300 XP BONUS</div>
+  </div>
+</div>
+
+<!-- ══ BROADCAST LOWER THIRD ══ -->
+<div id="lowerThird"><div class="lt-inner" id="lowerThirdText"></div></div>
+
+<!-- ══ WHITE FLASH ══ -->
+<div id="flashOverlay"></div>
+
+<!-- ══ LEVEL UP ══ -->
+<div id="levelUpOverlay">
+  <div class="levelup-card">
+    <span class="levelup-icon" id="levelUpEmoji">⭐</span>
+    <div class="levelup-label">RANK UP!</div>
+    <div class="levelup-rank" id="levelUpRank">ALL-PRO</div>
+    <div class="levelup-sub" id="levelUpSub"></div>
+    <button class="levelup-dismiss" onclick="document.getElementById('levelUpOverlay').classList.remove('show')">LET'S GO →</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  CLIP DATA — Official NFL Video Rulebook (Rich Eisen series)
+//  These open in a popup window since NFL blocks YouTube embedding.
+//  Facilitator can paste a specific URL in setup to override.
+// ════════════════════════════════════════
+const DEFAULT_CLIPS = [
+  { url:'https://www.youtube.com/watch?v=FYtwwnBQziQ', title:'The Snap',            emoji:'📡' },
+  { url:'https://www.youtube.com/watch?v=YQowPCzS3kM', title:'Down by Contact',     emoji:'🏃' },
+  { url:'https://www.youtube.com/watch?v=CJJartI-knA', title:'Completing a Catch',  emoji:'🤲' },
+  { url:'https://www.youtube.com/watch?v=mpt7Zk0E0bw', title:'The Forward Pass',    emoji:'➡️' },
+  { url:'https://www.youtube.com/watch?v=sMxT18z0mXU', title:'Scoring Plays',       emoji:'🏈' },
+  { url:'https://www.youtube.com/watch?v=Zr-Z2wXvkd8', title:'4th Down & The Punt', emoji:'🦵' },
+  { url:'https://www.youtube.com/watch?v=Ybjj_8TwJbQ', title:'The Sack',            emoji:'💥' },
+  { url:'https://www.youtube.com/watch?v=fRVSE-PMCio', title:'The Safety',          emoji:'⚡' },
+];
+const customUrls = ['','','','','','','',''];
+
+function getClip(playOrder) {
+  const custom = customUrls[playOrder];
+  if (custom && custom.trim()) {
+    return { url: custom.trim(), isCustom: true, title: 'Custom Clip', emoji: '▶', isSearch: false };
+  }
+  const d = DEFAULT_CLIPS[playOrder];
+  return { url: d.url, isCustom: false, title: d.title, emoji: d.emoji, isSearch: false };
+}
+
+function launchClip(url) {
+  // Open in a compact centered popup so the game stays visible behind it
+  const w = 900, h = 560;
+  const left = Math.max(0, Math.round((screen.width  - w) / 2));
+  const top  = Math.max(0, Math.round((screen.height - h) / 3));
+  window.open(url, 'coachmode_clip',
+    `width=${w},height=${h},left=${left},top=${top},` +
+    `toolbar=0,location=1,menubar=0,scrollbars=1,resizable=1`
+  );
+  // Unlock Done Watching after a short delay (time to switch back)
+  setTimeout(unlockDoneWatching, 1500);
+}
+
+function doneWatching() {
+  const btn = document.getElementById('doneBtn');
+  if (!btn || !btn.classList.contains('ready')) return;
+  onVideoEnded();
+}
+
+// ── YouTube IFrame API ─────────────────────────────
+function onYouTubeIframeAPIReady() {
+  ytApiReady = true;
+  if (pendingYTInit) { pendingYTInit(); pendingYTInit = null; }
+}
+
+function getVideoId(url) {
+  const m = url.match(/[?&]v=([^&]+)/);
+  return m ? m[1] : null;
+}
+
+function unlockDoneWatching() {
+  const btn = document.getElementById('doneBtn');
+  if (!btn || btn.classList.contains('ready')) return;
+  btn.classList.add('ready');
+  btn.disabled = false;
+  btn.textContent = 'Done Watching ✓';
+  const hint = document.getElementById('clipHint');
+  if (hint) hint.textContent = '✅ Back? Hit Done Watching to start the clock.';
+}
+
+function initYTEmbed(videoId) {
+  if (!videoId) return;
+  if (!ytApiReady) { pendingYTInit = () => initYTEmbed(videoId); return; }
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch(e){} ytPlayer = null; }
+  const target = document.getElementById('ytEmbedTarget');
+  if (!target) return;
+  ytPlayer = new YT.Player('ytEmbedTarget', {
+    videoId,
+    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+    events: {
+      onStateChange(e) {
+        // PLAYING (1) — auto-unlock; ENDED (0) — also unlock
+        if (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.ENDED) {
+          unlockDoneWatching();
+          G.videoWatched = true;
+        }
+      },
+      onError(e) {
+        // Error 150/101 = embedding disabled — fall back to external link
+        const wrap = document.getElementById('embedWrap');
+        const fallback = document.getElementById('clipFallback');
+        if (wrap) wrap.style.display = 'none';
+        if (fallback) fallback.style.display = 'block';
+        // Give user a moment then enable button (same as old click-to-open flow)
+        setTimeout(unlockDoneWatching, 1500);
+      }
+    }
+  });
+}
+// ─────────────────────────────────────────────────
+
+function onVideoEnded(){
+  const s = SLIDES[G.cur];
+  if (!s || s.type !== 'play' || G.answered) return;
+  G.videoWatched = true;
+  const optsList = document.getElementById('optsList');
+  if (optsList) optsList.classList.remove('opts-locked');
+  const waiting = document.getElementById('clockWaiting');
+  if (waiting) waiting.style.display = 'none';
+  const btn = document.getElementById('doneBtn');
+  if (btn) { btn.textContent = '⏱ Clock is running'; btn.style.background='var(--orange)'; btn.disabled=true; }
+  startClock();
+  comment('Clock\'s running. Discuss what you saw and make your call.');
+}
+
+// ════════════════════════════════════════
+//  SETUP
+// ════════════════════════════════════════
+function toggleSetup() {
+  const rows = document.getElementById('setupRows');
+  const arrow = document.getElementById('setupArrow');
+  const text = document.getElementById('setupToggleText');
+  const open = rows.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+  text.textContent = open ? 'Hide' : 'Swap clip URLs';
+}
+function saveUrls() {
+  for (let i = 0; i < 8; i++) {
+    const el = document.getElementById('url' + i);
+    if (el) customUrls[i] = el.value.trim();
+  }
+  const saved = document.getElementById('setupSaved');
+  saved.style.display = 'inline';
+  setTimeout(() => saved.style.display = 'none', 2000);
+}
+
+// ════════════════════════════════════════
+//  SLIDES
+// ════════════════════════════════════════
+const SLIDES = [
+
+  // 0 — Field
+  { type:'teach', phase:'Act 1 · The Basics', render:()=>`
+    <div class="act-div"><div class="act-div-line"></div><div class="act-div-text">Act 1 of 3 · The Basics</div><div class="act-div-line"></div></div>
+    <div class="teach-icon">🏟️</div>
+    <div class="teach-title">The <em>Playing Field</em></div>
+    <div class="teach-body">An NFL field is <strong>100 yards long</strong> with a <strong>10-yard end zone</strong> at each end. Your team starts near its own end zone and drives toward the opponent's to score.</div>
+    <div class="field-svg-wrap">
+      <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+        <rect width="760" height="160" fill="#1c4230"/>
+        <rect x="76" y="0" width="60.8" height="160" fill="#215038" opacity=".65"/>
+        <rect x="197.6" y="0" width="60.8" height="160" fill="#215038" opacity=".65"/>
+        <rect x="319.2" y="0" width="60.8" height="160" fill="#215038" opacity=".65"/>
+        <rect x="440.8" y="0" width="60.8" height="160" fill="#215038" opacity=".65"/>
+        <rect x="562.4" y="0" width="60.8" height="160" fill="#215038" opacity=".65"/>
+        <rect x="0" y="0" width="76" height="160" fill="#0e2c1c"/>
+        <rect x="684" y="0" width="76" height="160" fill="#0e2c1c"/>
+        <line x1="76"  y1="0" x2="76"  y2="160" stroke="white" stroke-width="2"   opacity=".4"/>
+        <line x1="228" y1="0" x2="228" y2="160" stroke="white" stroke-width="1.5" opacity=".25"/>
+        <line x1="380" y1="0" x2="380" y2="160" stroke="white" stroke-width="2.5" opacity=".42"/>
+        <line x1="532" y1="0" x2="532" y2="160" stroke="white" stroke-width="1.5" opacity=".25"/>
+        <line x1="684" y1="0" x2="684" y2="160" stroke="white" stroke-width="2"   opacity=".4"/>
+        <text x="38"  y="84" text-anchor="middle" font-family="Archivo Black,sans-serif" font-size="10" fill="white" opacity=".42" transform="rotate(-90,38,84)">END ZONE</text>
+        <text x="722" y="84" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="10" font-weight="800" fill="#FFDC2E" opacity=".88" transform="rotate(90,722,84)">SCORE HERE</text>
+        <text x="228" y="85" text-anchor="middle" font-family="Archivo Black,sans-serif" font-size="13" fill="white" opacity=".38">20</text>
+        <text x="380" y="85" text-anchor="middle" font-family="Archivo Black,sans-serif" font-size="14" fill="white" opacity=".52">50</text>
+        <text x="532" y="85" text-anchor="middle" font-family="Archivo Black,sans-serif" font-size="13" fill="white" opacity=".38">20</text>
+        <defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0070EB"/></marker></defs>
+        <line x1="108" y1="80" x2="676" y2="80" stroke="#0070EB" stroke-width="2" stroke-dasharray="8,5" marker-end="url(#ah)" opacity=".72"/>
+        <ellipse cx="108" cy="80" rx="10" ry="7" fill="#c8a050" stroke="#7a5010" stroke-width="1.5"/>
+        <line x1="101" y1="80" x2="115" y2="80" stroke="white" stroke-width="1" opacity=".7"/>
+        <text x="390" y="63" text-anchor="middle" font-family="DM Mono,monospace" font-size="9" fill="#0070EB" opacity=".82">← Offense drives this way →</text>
+      </svg>
+    </div>
+    <div class="callout"><div class="callout-icon">💡</div><div>Yard numbers <strong>count up to 50</strong> at midfield, then back down to 0. "The opponent's 20" means 20 yards from their end zone — prime scoring territory.</div></div>
+  `},
+
+  // 1 — Downs
+  { type:'teach', phase:'Act 1 · The Basics', render:()=>`
+    <div class="teach-icon">🔢</div>
+    <div class="teach-title">Downs: The <em>Heartbeat</em></div>
+    <div class="teach-body">You get <strong>4 attempts</strong> — called <em>downs</em> — to move forward <strong>10 yards</strong>. Gain 10 and you get a fresh set of 4. Use all 4 without gaining 10 and the other team gets the ball.</div>
+    <div class="downs-exp">
+      <div class="de-row"><div class="de-down">1st &amp; 10</div><span style="color:var(--chalk-dim);font-size:13px">First attempt. Need 10 yards.</span></div>
+      <div class="de-row"><div class="de-down">2nd &amp; 6</div><span style="color:var(--chalk-dim);font-size:13px">Gained 4 yards. 6 still needed.</span></div>
+      <div class="de-row"><div class="de-down">3rd &amp; 2</div><span style="color:var(--chalk-dim);font-size:13px">Gained 4 more. Almost there.</span></div>
+      <div class="de-row" style="opacity:.5"><div class="de-down" style="color:var(--red)">4th down</div><span style="color:var(--chalk-dim);font-size:13px">Last chance — punt, kick, or go for it.</span></div>
+      <div class="de-row" style="border:none"><div class="de-down" style="color:var(--green)">✓ 1st Down!</div><span style="color:var(--chalk-dim);font-size:13px">Reach 10 yards → reset! Drive continues.</span></div>
+    </div>
+    <div class="callout"><div class="callout-icon">🎙️</div><div>When you hear <strong>"3rd and 2"</strong> — that's the third attempt with 2 yards still to gain. First number is the down, second is yards to go.</div></div>
+  `},
+
+  // 2 — Positions
+  { type:'teach', phase:'Act 1 · The Basics', render:()=>`
+    <div class="teach-icon">👥</div>
+    <div class="teach-title">The 4 Positions You'll <em>Hear About Most</em></div>
+    <div class="teach-body">There are 11 players on each side. These four come up in customer conversations all the time.</div>
+    <div class="pos-grid">
+      <div class="pos-card"><div class="pos-abbr">QB</div><div class="pos-name">Quarterback</div><div class="pos-desc">The <strong>commander</strong>. Throws passes, hands off the ball. On the field every offensive play.</div></div>
+      <div class="pos-card"><div class="pos-abbr">RB</div><div class="pos-name">Running Back</div><div class="pos-desc">Takes handoffs and <strong>runs through gaps</strong>. Also catches short passes.</div></div>
+      <div class="pos-card"><div class="pos-abbr">WR</div><div class="pos-name">Wide Receiver</div><div class="pos-desc">Runs routes and <strong>catches passes</strong> downfield. Usually the team's fastest players.</div></div>
+      <div class="pos-card"><div class="pos-abbr">TE</div><div class="pos-name">Tight End</div><div class="pos-desc">A <strong>hybrid</strong> — blocks like a lineman AND catches passes. Lines up next to the line.</div></div>
+    </div>
+    <div class="callout"><div class="callout-icon">💡</div><div>The <strong>Kicker (K)</strong> kicks field goals and extra points. You'll meet them in the scoring section.</div></div>
+  `},
+
+  // 3 — Act 2 bridge
+  { type:'teach', phase:'Act 2 · The Drive', render:()=>`
+    <div class="act-div"><div class="act-div-line"></div><div class="act-div-text">Act 2 of 3 · The Drive</div><div class="act-div-line"></div></div>
+    <div class="teach-icon">📋</div>
+    <div class="teach-title">Here's How It <em>Works</em></div>
+    <div class="teach-body">
+      Each play starts with a question. Watch the NFL clip together as a group — then call it.<br><br>
+      <strong>✅ Right answer:</strong> gain 10 yards, ball moves forward.<br>
+      <strong>❌ Wrong answer:</strong> lose a down — 4 wrong = turnover, yards go back.<br>
+      <strong>⏱ Clock expires:</strong> delay of game — 5-yard penalty.<br><br>
+      You've got <em>one Challenge Flag</em> (top bar) to eliminate a wrong answer. Use it wisely.
+    </div>
+    <div class="callout"><div class="callout-icon">▶</div><div>Every play has a real <strong>NFL clip</strong>. Watch it together, then answer. The clock starts once you hit Done watching.</div></div>
+  `},
+
+  // 4 — PLAY 1: The Snap
+  { type:'play', phase:'Play 1 · The Snap', playOrder:0, clock:true,
+    eyebrow:'Play 1 · The Snap',
+    question:'Every single play starts the same way. What kicks it off?',
+    clipIntro:'Watch this official NFL clip, then answer below.',
+    opts:[
+      'The QB runs whenever he feels ready',
+      'The center hikes (snaps) the ball to the QB — this starts every single play',
+      'The referee blows a whistle and hands the ball to the QB',
+    ],
+    correct:1, yardGain:10,
+    reveal:{ title:'✅ The snap — 10 yards!', body:'Every play begins with a <strong>snap</strong> — the center hikes the ball to the QB. Nothing moves until it happens. Jump early? That\'s a <strong>false start</strong> — 5-yard penalty before the play even starts.' }
+  },
+
+  // 5 — PLAY 2: Handoff / Down by Contact
+  { type:'play', phase:'Play 2 · Down by Contact', playOrder:1, clock:true,
+    eyebrow:'Play 2 · When Does a Play End?',
+    question:'The running back takes the ball and gets hit. When is the play actually over?',
+    clipIntro:'This clip shows exactly when a play ends. Watch then answer.',
+    opts:[
+      'When the RB decides to stop running',
+      'When a defender touches any part of the RB\'s body',
+      'When the RB\'s knee or body (other than hands/feet) hits the ground after contact with a defender',
+    ],
+    correct:2, yardGain:10,
+    reveal:{ title:'✅ Down by contact — 10 yards!', body:'A play ends when the carrier is <strong>"down by contact"</strong> — their knee, elbow, or body hits the ground after being touched by a defender. Just being touched isn\'t enough. That\'s why you\'ll hear "was he down?" debates on every big run.' }
+  },
+
+  // 6 — PLAY 3: Completing a Catch
+  { type:'play', phase:'Play 3 · Completing a Catch', playOrder:2, clock:true,
+    eyebrow:'Play 3 · Complete or Incomplete?',
+    question:'The receiver catches it — but hits the turf hard. Does that count?',
+    clipIntro:'This is one of football\'s trickiest rules. Watch before you answer.',
+    opts:[
+      'The receiver just needs to have both hands on the ball',
+      'The receiver must catch it, get two feet in bounds, and maintain control through the catch — including hitting the ground',
+      'If the receiver catches it standing up, it always counts',
+    ],
+    correct:1, yardGain:10,
+    reveal:{ title:'✅ Completing a catch — 10 yards!', body:'A catch needs three things: <strong>control of the ball, two feet in bounds, and surviving the ground</strong>. If the ball pops loose when they hit the turf, it\'s incomplete. That\'s why catches sometimes get overturned on replay — it\'s not just about holding on.' }
+  },
+
+  // 7 — PLAY 4: Forward Pass / First Down
+  { type:'play', phase:'Play 4 · The Forward Pass', playOrder:3, clock:true,
+    eyebrow:'Play 4 · The Forward Pass',
+    question:'The QB drops back to throw. What makes a forward pass legal?',
+    clipIntro:'Watch the NFL explain the forward pass rule, then answer.',
+    opts:[
+      'The QB can throw from anywhere on the field as many times as he wants per play',
+      'Only one forward pass per play, thrown from behind the line of scrimmage — by the QB or any player',
+      'The QB must throw within 3 seconds of the snap or it\'s a penalty',
+    ],
+    correct:1, yardGain:10,
+    reveal:{ title:'✅ Forward pass — first down! +10 yards!', body:'Only <strong>one forward pass per play</strong>, and it must be thrown from <strong>behind the line of scrimmage</strong>. Any eligible player can throw it — but it\'s almost always the QB. Throw from in front of the line and it\'s an illegal forward pass. Costly penalty.' }
+  },
+
+  // 8 — Scoring
+  { type:'teach', phase:'How Teams Score', render:()=>`
+    <div class="teach-icon">🏆</div>
+    <div class="teach-title">How Teams <em>Score</em></div>
+    <div class="teach-body">Five ways to put points on the board — the first two come up constantly.</div>
+    <div class="score-grid">
+      <div class="score-card"><div class="score-pts">6<small>pts</small></div><div class="score-name">Touchdown</div><div class="score-note">Ball crosses the goal line or caught in end zone.</div></div>
+      <div class="score-card"><div class="score-pts">3<small>pts</small></div><div class="score-name">Field Goal</div><div class="score-note">Kicker boots it through the uprights.</div></div>
+      <div class="score-card"><div class="score-pts">1<small>pt</small></div><div class="score-name">Extra Point</div><div class="score-note">A kick after a TD. Almost always successful.</div></div>
+      <div class="score-card"><div class="score-pts">2<small>pts</small></div><div class="score-name">2-Pt Conv.</div><div class="score-note">Run or pass into end zone after TD instead of kicking.</div></div>
+      <div class="score-card"><div class="score-pts">2<small>pts</small></div><div class="score-name">Safety</div><div class="score-note">Defense tackles offense in their own end zone.</div></div>
+    </div>
+    <div class="callout"><div class="callout-icon">💡</div><div>A typical scoring drive = <strong>7 points</strong> (TD + extra point kick). That's why NFL scores like 28–17 are multiples of 7.</div></div>
+  `},
+
+  // 9 — PLAY 5: Scoring Plays / Touchdown
+  { type:'play', phase:'Play 5 · Scoring', playOrder:4, clock:true, isTouchdown:true,
+    eyebrow:'Play 5 · Scoring Plays',
+    question:'You\'re in the Red Zone — prime scoring territory. How many ways can a team actually score?',
+    clipIntro:'Watch Rich Eisen break down every scoring play in the NFL.',
+    opts:[
+      '2 ways to score — touchdown (7 pts) or field goal (3 pts)',
+      '5 ways to score — touchdown (6), field goal (3), extra point (1), 2-pt conversion (2), safety (2)',
+      '3 ways to score — touchdown (6), field goal (3), safety (2)',
+    ],
+    correct:1, yardGain:10,
+    reveal:{ title:'🏈 Touchdown! +10 yards!', body:'There are <strong>5 ways to score</strong>. A touchdown is 6 points — then the kicker almost always adds 1 more for 7 total. The Red Zone (inside the 20) is prime scoring territory. Getting in here and coming away empty? That\'s a momentum killer.' }
+  },
+
+  // 10 — PLAY 6: Play Clock / 4th Down
+  { type:'play', phase:'Play 6 · The Play Clock', playOrder:5, clock:true, noWrong:true,
+    eyebrow:'Play 6 · The Play Clock',
+    question:'It\'s 4th and 8 from your own 28-yard line. What\'s the play clock — and what do you do with it here?',
+    clipIntro:'Watch how the play clock works, then debate the 4th down call.',
+    opts:[
+      'Punt — kick it deep, make the opponent drive the whole field',
+      'Go for it — run a play and try to gain 8 yards',
+      'Attempt a 62-yard field goal',
+    ],
+    correct:0, yardGain:10,
+    reveal:{ title:'🤔 The 4th down debate', body:'The <strong>play clock</strong> gives you 40 seconds to snap the ball — hesitate and it\'s a delay of game penalty. Deep in your own territory on 4th & 8, <strong>punting</strong> is the smart call: a good punt pins your opponent near their own end zone. Going for it is bold — but if you fail, you\'ve handed them the ball with great field position.' }
+  },
+
+  // 11 — PLAY 7: Sack / Intentional Grounding
+  { type:'play', phase:'Play 7 · QB Under Pressure', playOrder:6, clock:true,
+    eyebrow:'Play 7 · QB Under Pressure',
+    question:'Defenders are swarming the QB. He panics and throws it into the ground. What happens?',
+    clipIntro:'Watch the intentional grounding rule — it\'s directly tied to the sack.',
+    opts:[
+      'Nothing — the QB can always throw the ball away to avoid a sack',
+      'Intentional grounding penalty — loss of down and yards, similar to a sack',
+      'The play is simply replayed from the original spot',
+    ],
+    correct:1, yardGain:10,
+    reveal:{ title:'✅ Intentional grounding — +10 yards!', body:'Throwing the ball away with no realistic chance of completion? That\'s <strong>intentional grounding</strong> — a penalty that costs a down and yards. A real <strong>sack</strong> (QB tackled behind the line) does the same damage. Either way, it\'s a drive-killer.' }
+  },
+
+  // 12 — PLAY 8: Safety
+  { type:'play', phase:'Play 8 · The Safety', playOrder:7, clock:true,
+    eyebrow:'Play 8 · The Safety',
+    question:'The QB is scrambling around in his own end zone. Your defender brings him down right there. What just happened?',
+    clipIntro:'Watch Rich Eisen break down one of football\'s rarest scoring plays.',
+    opts:[
+      'A safety — the defense scores 2 points and gets the ball back',
+      'A touchdown for the defense — they score 6 points',
+      'A penalty — the offense gets an automatic first down',
+    ],
+    correct:0, yardGain:10,
+    reveal:{ title:'✅ Safety — 2 points + possession! +10 yards!', body:'A <strong>safety</strong> scores 2 points for the defense — and the offense has to punt the ball right back. It\'s one of football\'s rarest plays, but it\'s a massive momentum swing when it happens. You\'ve now driven the full field and covered every core rule of the game. Well done.' }
+  },
+];
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+const G = {
+  cur:0, yards:0, down:0, answered:false,
+  videoWatched:false,   // has the video been played on current slide?
+  challengeUsed:false, correct:0, touchdowns:0, totalQ:0,
+  sessionXp:0, streak:0
+};
+let clockInterval=null, clockSecs=30, clockStartTime=null;
+const CLOCK_SECS=30;
+// YouTube IFrame player state
+let ytPlayer=null, ytApiReady=false, pendingYTInit=null;
+const PLAY_SLIDE_INDICES = SLIDES.reduce((acc,s,i)=>{if(s.type==='play')acc.push(i);return acc;},[]);
+
+// ════════════════════════════════════════
+//  GLOSSARY
+// ════════════════════════════════════════
+const GLOSSARY=[
+  {term:'🏟️ End Zone',def:'10-yard area at each end. Score a TD here.'},
+  {term:'🔢 Down',def:'One play attempt. 4 downs to gain 10 yards.'},
+  {term:'✅ First Down',def:'Gaining 10 yards resets to 4 fresh attempts.'},
+  {term:'📡 Snap',def:'Center hikes the ball to the QB. Starts every play.'},
+  {term:'📋 Down by Contact',def:'Play ends when the carrier\'s body hits the ground after contact.'},
+  {term:'🤲 Completing a Catch',def:'Control + 2 feet in bounds + survive the ground.'},
+  {term:'➡️ Forward Pass',def:'One per play, thrown from behind the line of scrimmage.'},
+  {term:'🎯 Red Zone',def:'Inside opponent\'s 20-yard line. Prime scoring area.'},
+  {term:'🏈 Touchdown (6)',def:'Ball crosses goal line. Usually followed by +1 extra point.'},
+  {term:'⏱ Play Clock',def:'40 seconds to snap the ball or it\'s a delay of game penalty.'},
+  {term:'💥 Sack / Int. Grounding',def:'QB tackled or throws away illegally — costs a down and yards.'},
+  {term:'⚡ Safety (2)',def:'Defense tackles offense in their own end zone. Gets the ball back too.'},
+];
+
+// ════════════════════════════════════════
+//  COMMENTARY
+// ════════════════════════════════════════
+const C_CORRECT=['That\'s it. You read it perfectly — chains are moving.','Yes! First down. You\'re making this look easy.','Textbook. The drive is alive and you\'re moving the ball.','Smart play. That\'s the kind of call that wins games.','That\'s the one. Well coached.'];
+const C_WRONG=['Not this time — but that\'s how you learn. Down goes up.','The defense makes you pay. It happens. You\'re still in this.','Every great coach has made that call. Now you know.','Tough one. The answer\'s revealed — keep it for next time.'];
+const C_VIDEO=['Watch the clip together, then make your call.','Film study time — see it happen, then commit to an answer.','Watch as a group first. The clock starts after.','This one\'s tricky. Watch the clip before you answer.'];
+
+function comment(text,mood){
+  document.getElementById('commentText').textContent=text;
+  const el=document.getElementById('commentary');
+  el.className='';
+  if(mood==='win')el.className='win-c';
+  if(mood==='lose')el.className='lose-c';
+}
+function rnd(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+// ════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════
+function startGame(){
+  document.getElementById('titleScreen').classList.add('hidden');
+  document.getElementById('app').style.visibility='visible';
+  updateXPBar();
+  updateCrowdMeter(0);
+  comment('Good luck out there. Watch each clip as a group, then make your call.');
+  renderSlide();
+}
+function restartGame(){
+  G.cur=0;G.yards=0;G.down=0;G.answered=false;G.videoWatched=false;
+  G.challengeUsed=false;G.correct=0;G.touchdowns=0;G.totalQ=0;
+  G.sessionXp=0;G.streak=0;
+  crowdEnergy=0; updateCrowdMeter(0);
+  stopClock();
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch(e){} ytPlayer=null; }
+  document.getElementById('endScreen').classList.add('hidden');
+  document.getElementById('flagBtn').disabled=false;
+  comment('Welcome back. Let\'s run it again — see how fast you can get it this time.');
+  renderSlide();
+}
+
+// ════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════
+function renderSlide(){
+  stopClock();
+  G.answered=false;
+  G.videoWatched=false;
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch(e){} ytPlayer=null; }
+
+  const s=SLIDES[G.cur], total=SLIDES.length;
+  document.getElementById('phaseLbl').textContent=s.phase||'';
+  document.getElementById('slide-counter').textContent=`${G.cur+1} / ${total}`;
+  updateField();
+
+  const sc=document.getElementById('slideContent');
+  sc.innerHTML='';
+  document.getElementById('content').scrollTop=0;
+
+  if(s.type==='teach'){
+    comment('Quick fundamentals first — then we get back on the field.');
+    sc.innerHTML=s.render();
+  } else {
+    renderPlay(s);
+  }
+
+  document.getElementById('backBtn').disabled=G.cur===0;
+  document.getElementById('nextBtn').disabled=false;
+  document.getElementById('nextBtn').textContent=G.cur===total-1?'Finish →':'Next →';
+}
+
+function renderPlay(s){
+  const clip = getClip(s.playOrder);
+  const badgeLabel = clip.isCustom ? 'Custom Clip' : 'NFL Rulebook';
+
+  document.getElementById('slideContent').innerHTML=`
+    <div class="play-eyebrow">${s.eyebrow}</div>
+    <div class="play-question">${s.question}</div>
+
+    <div class="video-section">
+      <div class="watch-prompt">
+        <span class="watch-label">▶ Watch the Play</span>
+        <span class="nfl-badge">${badgeLabel}</span>
+      </div>
+      <div class="clip-card">
+        <!-- Inline embed (shown by default) -->
+        <div class="embed-wrap" id="embedWrap">
+          <div id="ytEmbedTarget"></div>
+        </div>
+        <!-- Fallback — shown only if YouTube blocks embedding -->
+        <div class="clip-fallback" id="clipFallback" onclick="launchClip('${clip.url.replace(/'/g,"\\'")}')">
+          <div class="clip-play-overlay" style="background:linear-gradient(135deg,#0b1c2e,#1a3558);">
+            <div style="font-size:48px;margin-bottom:8px;">${clip.emoji}</div>
+            <div class="clip-play-btn"><span class="clip-play-icon">▶</span></div>
+            <div class="clip-title-overlay" style="margin-top:10px;">${clip.title}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:6px;">OPENS IN POPUP WINDOW</div>
+          </div>
+        </div>
+        <div class="clip-footer">
+          <div class="clip-footer-label" id="clipHint">▶ Click to open in a video window — hit Done Watching when you're back</div>
+          <button class="done-watching-btn" id="doneBtn" onclick="doneWatching()" disabled>Watch first</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="clock-waiting" id="clockWaiting">
+      <span class="dot"></span>
+      <span>The clock starts once you've watched the clip</span>
+    </div>
+
+    <div class="options opts-locked" id="optsList">
+      ${s.opts.map((o,i)=>`
+        <button class="opt" id="opt${i}" onclick="selectAnswer(${i})">
+          <span class="opt-letter">${['A','B','C'][i]}.</span>${o}
+        </button>
+      `).join('')}
+    </div>
+
+    <div class="reveal-panel" id="revealPanel">
+      <div class="reveal-title" id="revealTitle"></div>
+      <div class="reveal-body" id="revealBody"></div>
+    </div>
+  `;
+  // Initialise inline YouTube embed after DOM is set
+  initYTEmbed(getVideoId(clip.url));
+}
+
+// ════════════════════════════════════════
+//  ANSWER
+// ════════════════════════════════════════
+function selectAnswer(idx){
+  // Prevent answering while locked
+  const list = document.getElementById('optsList');
+  if (!list || list.classList.contains('opts-locked')) return;
+  if (G.answered) return;
+
+  const answerTime = clockStartTime ? Math.round((Date.now()-clockStartTime)/1000) : CLOCK_SECS;
+  G.answered=true; stopClock(); G.totalQ++;
+  const s=SLIDES[G.cur];
+  const btns=document.querySelectorAll('.opt');
+  btns.forEach(b=>b.disabled=true);
+
+  const isCorrect=s.noWrong||idx===s.correct;
+  if(isCorrect){
+    btns[idx].classList.add('correct');
+    G.correct++; G.yards=Math.min(G.yards+s.yardGain,100); G.down=0;
+    G.streak++;
+    // XP: base 100 + speed bonus + streak bonus
+    const speedBonus = answerTime<=10?50:answerTime<=20?25:0;
+    const streakBonus = G.streak>=2?50:0;
+    awardXP(100, speedBonus, streakBonus);
+    updateCrowdMeter(22);
+    if(s.isTouchdown){
+      G.touchdowns++;
+      awardXP(200,0,0); // bonus TD XP
+      comment('Touchdown! You drove this team down the field. That\'s what coaching looks like.','win');
+      showTDCelebration(); playTDRoar();
+      showLowerThird('🏈 TOUCHDOWN — 6 POINTS SCORED');
+    } else {
+      comment(rnd(C_CORRECT),'win');
+      playCheer();
+      showLowerThird(rnd(C_LOWERTHIRD_CORRECT));
+    }
+  } else {
+    btns[idx].classList.add('wrong');
+    btns[s.correct].classList.add('reveal');
+    G.streak=0;
+    G.down++; flashPenalty(); comment(rnd(C_WRONG),'lose');
+    awardXP(10,0,0); // consolation XP for watching
+    updateCrowdMeter(-15);
+    playBoo();
+    if(G.down>=4){G.down=0;G.yards=Math.max(0,G.yards-10);}
+  }
+
+  const rp=document.getElementById('revealPanel');
+  document.getElementById('revealTitle').textContent=s.reveal.title;
+  document.getElementById('revealBody').innerHTML=s.reveal.body;
+  rp.classList.add('show');
+  updateField();
+  document.getElementById('nextBtn').textContent=G.cur===SLIDES.length-1?'Finish →':'Next →';
+}
+
+// ════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════
+function nextSlide(){
+  const s=SLIDES[G.cur];
+  if(s.type==='play'&&!G.answered){
+    // Pulse the question to prompt
+    const q=document.querySelector('.play-question');
+    if(q){q.style.color='var(--orange)';setTimeout(()=>q.style.color='',600);}
+    return;
+  }
+  if(G.cur>=SLIDES.length-1){showEnd();return;}
+  G.cur++; renderSlide();
+}
+function prevSlide(){
+  if(G.cur<=0)return;
+  stopClock(); G.cur--; renderSlide();
+}
+
+// ════════════════════════════════════════
+//  FIELD
+// ════════════════════════════════════════
+function updateField(){
+  document.getElementById('yardFill').style.width=Math.max(G.yards,2)+'%';
+  document.getElementById('yardsDisplay').textContent=G.yards+' yds';
+  document.getElementById('downPips').innerHTML=[0,1,2,3].map(i=>{
+    let c='pip';
+    if(i<G.down)c+=' used';
+    else if(i===G.down)c+=' active';
+    return `<div class="${c}">${i+1}</div>`;
+  }).join('');
+  const dn=['1st','2nd','3rd','4th'];
+  const needed=G.yards>=90?'Goal':Math.max(10-(G.yards%10||10),1);
+  document.getElementById('downText').innerHTML=`<em>${dn[G.down]}</em> & ${needed}`;
+}
+function flashPenalty(){
+  const el=document.getElementById('penaltyFlash');
+  el.style.opacity='1'; setTimeout(()=>el.style.opacity='0',500);
+}
+
+// ════════════════════════════════════════
+//  CLOCK
+// ════════════════════════════════════════
+function startClock(){
+  clockSecs=CLOCK_SECS; clockStartTime=Date.now(); updateClockUI();
+  clockInterval=setInterval(()=>{
+    clockSecs--; updateClockUI();
+    if(clockSecs<=0){stopClock();triggerDelay();}
+  },1000);
+}
+function stopClock(){
+  clearInterval(clockInterval); clockInterval=null;
+  document.getElementById('clockNum').textContent='—';
+  const arc=document.getElementById('clockArc');
+  arc.style.strokeDashoffset='0';
+  arc.style.stroke='var(--orange)';
+}
+function updateClockUI(){
+  document.getElementById('clockNum').textContent=clockSecs;
+  const arc=document.getElementById('clockArc');
+  arc.style.strokeDashoffset=75.4*(1-clockSecs/CLOCK_SECS);
+  arc.style.stroke=clockSecs<=8?'#D22839':clockSecs<=15?'#FFDC2E':'var(--orange)';
+}
+function triggerDelay(){
+  G.yards=Math.max(0,G.yards-5); updateField(); flashPenalty();
+  document.getElementById('penaltyOverlay').classList.add('show');
+}
+function dismissPenalty(){
+  document.getElementById('penaltyOverlay').classList.remove('show');
+  if(!G.answered){
+    G.answered=true; G.down++; G.totalQ++;
+    const s=SLIDES[G.cur];
+    const btns=document.querySelectorAll('.opt');
+    btns.forEach(b=>b.disabled=true);
+    if(btns[s.correct])btns[s.correct].classList.add('reveal');
+    const rp=document.getElementById('revealPanel');
+    if(rp){
+      document.getElementById('revealTitle').textContent=s.reveal.title;
+      document.getElementById('revealBody').innerHTML=s.reveal.body;
+      rp.classList.add('show');
+    }
+    if(G.down>=4){G.down=0;G.yards=Math.max(0,G.yards-10);}
+    updateField();
+    comment('Delay of game — 5-yard penalty. The clock never waits.','lose');
+    document.getElementById('nextBtn').textContent=G.cur===SLIDES.length-1?'Finish →':'Next →';
+  }
+}
+
+// ════════════════════════════════════════
+//  CHALLENGE
+// ════════════════════════════════════════
+function useChallenge(){
+  if(G.challengeUsed)return;
+  const s=SLIDES[G.cur];
+  if(!s||s.type!=='play'||G.answered)return;
+  const list=document.getElementById('optsList');
+  if(list&&list.classList.contains('opts-locked'))return; // can't challenge before watching
+  G.challengeUsed=true;
+  document.getElementById('flagBtn').disabled=true;
+  const wrong=s.opts.map((_,i)=>i).filter(i=>i!==s.correct);
+  const toElim=wrong[Math.floor(Math.random()*wrong.length)];
+  const btn=document.getElementById('opt'+toElim);
+  if(btn){btn.classList.add('elim');btn.disabled=true;}
+  comment('🚩 Challenge accepted! One wrong answer eliminated. That was your only flag — choose wisely.');
+}
+
+// ════════════════════════════════════════
+//  END SCREEN
+// ════════════════════════════════════════
+function showEnd(){
+  stopClock();
+  const won=G.touchdowns>0||G.yards>=80;
+  document.getElementById('endTrophy').textContent=won?'🏆':'📋';
+  document.getElementById('endTitle').innerHTML=won?'Drive <em>Complete!</em>':'Great <em>Session!</em>';
+  document.getElementById('endSub').textContent=won
+    ?'You watched the film, made the calls, and scored. That\'s exactly what coaches do.'
+    :'Every great coach studies the film. You just did — and you\'ve got the key concepts down.';
+  document.getElementById('statCorrect').textContent=G.correct;
+  document.getElementById('statYards').textContent=G.yards;
+  document.getElementById('statTD').textContent=G.touchdowns;
+  document.getElementById('statXP').textContent=G.sessionXp;
+  // XP rank progress
+  const rank=getRank(totalXp), next=getNextRank(totalXp);
+  const rw=document.getElementById('endRankWrap'); rw.style.display='block';
+  document.getElementById('endRankLabel').textContent=rank.icon+' '+rank.name.toUpperCase()+' · '+totalXp.toLocaleString()+' XP TOTAL';
+  const rf=document.getElementById('endRankFill'); rf.style.background=rank.color;
+  if(next){
+    const pct=Math.round(((totalXp-rank.min)/(next.min-rank.min))*100);
+    rf.style.width=pct+'%';
+    document.getElementById('endRankNext').textContent=pct+'% TOWARD '+next.icon+' '+next.name.toUpperCase();
+  } else {
+    rf.style.width='100%'; rf.style.background='#c084fc';
+    document.getElementById('endRankNext').textContent='🏆 MAXIMUM RANK ACHIEVED';
+  }
+  document.getElementById('endGlossary').innerHTML=GLOSSARY.map(g=>`
+    <div class="gl-item"><div class="gl-term">${g.term}</div><div class="gl-def">${g.def}</div></div>
+  `).join('');
+  document.getElementById('endScreen').classList.remove('hidden');
+  if(won)spawnConfetti();
+}
+
+// ════════════════════════════════════════
+//  XP / RANK SYSTEM
+// ════════════════════════════════════════
+const RANKS=[
+  {name:'Rookie',       min:0,    icon:'🥉',color:'#8a9aaa'},
+  {name:'Starter',      min:500,  icon:'🥈',color:'#c0c0c0'},
+  {name:'Pro Bowl',     min:1500, icon:'🥇',color:'#FFDC2E'},
+  {name:'All-Pro',      min:3500, icon:'⭐', color:'#0070EB'},
+  {name:'Hall of Famer',min:7000, icon:'🏆',color:'#c084fc'},
+];
+function getRank(xp){for(let i=RANKS.length-1;i>=0;i--){if(xp>=RANKS[i].min)return RANKS[i];}return RANKS[0];}
+function getNextRank(xp){for(let i=0;i<RANKS.length;i++){if(xp<RANKS[i].min)return RANKS[i];}return null;}
+
+let totalXp=parseInt(localStorage.getItem('cm_xp')||'0');
+
+function awardXP(base,speedBonus=0,streakBonus=0){
+  const earned=base+speedBonus+streakBonus;
+  G.sessionXp=(G.sessionXp||0)+earned;
+  const oldRank=getRank(totalXp);
+  totalXp+=earned;
+  try{localStorage.setItem('cm_xp',totalXp);}catch(e){}
+  const newRank=getRank(totalXp);
+  updateXPBar();
+  if(oldRank.name!==newRank.name) setTimeout(()=>showLevelUp(newRank),900);
+  return earned;
+}
+
+function updateXPBar(){
+  const rank=getRank(totalXp), next=getNextRank(totalXp);
+  const badge=document.getElementById('rankBadge');
+  const fill=document.getElementById('xpMiniFill');
+  if(!badge||!fill) return;
+  badge.textContent=rank.icon+' '+rank.name.toUpperCase();
+  badge.style.color=rank.color;
+  badge.style.borderColor=rank.color+'66';
+  if(next){
+    const pct=Math.round(((totalXp-rank.min)/(next.min-rank.min))*100);
+    fill.style.width=pct+'%';
+    fill.style.background=rank.color;
+  } else {
+    fill.style.width='100%';
+    fill.style.background='#c084fc';
+  }
+}
+
+function showLevelUp(newRank){
+  document.getElementById('levelUpEmoji').textContent=newRank.icon;
+  document.getElementById('levelUpRank').textContent=newRank.name.toUpperCase();
+  document.getElementById('levelUpRank').style.color=newRank.color;
+  document.getElementById('levelUpSub').textContent='You\'ve reached '+newRank.name+'. Keep it going.';
+  document.getElementById('levelUpOverlay').classList.add('show');
+}
+
+// ════════════════════════════════════════
+//  CROWD ENERGY METER
+// ════════════════════════════════════════
+let crowdEnergy=0;
+function updateCrowdMeter(delta){
+  crowdEnergy=Math.max(0,Math.min(100,crowdEnergy+delta));
+  const fill=document.getElementById('crowdFill');
+  const pct=document.getElementById('crowdPct');
+  if(fill){
+    fill.style.width=crowdEnergy+'%';
+    fill.style.background=crowdEnergy>70?'#1BB152':crowdEnergy>40?'#FFDC2E':'#0070EB';
+  }
+  if(pct) pct.textContent=Math.round(crowdEnergy)+'%';
+}
+
+// ════════════════════════════════════════
+//  BROADCAST LOWER THIRD
+// ════════════════════════════════════════
+const C_LOWERTHIRD_CORRECT=[
+  '🏈 FIRST DOWN — CHAINS MOVING',
+  '✅ CORRECT CALL — DRIVE CONTINUES',
+  '📡 GREAT READ — BALL MOVES FORWARD',
+  '🟢 SMART PLAY — 10 YARDS GAINED',
+  '🔥 NICE CALL — KEEP THE DRIVE ALIVE',
+];
+let _ltTimer=null;
+function showLowerThird(text){
+  if(_ltTimer) clearTimeout(_ltTimer);
+  const el=document.getElementById('lowerThird');
+  const inner=document.getElementById('lowerThirdText');
+  if(!el||!inner) return;
+  inner.textContent=text;
+  el.classList.add('show');
+  _ltTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ════════════════════════════════════════
+//  TOUCHDOWN CELEBRATION
+// ════════════════════════════════════════
+function showTDCelebration(){
+  const flash=document.getElementById('flashOverlay');
+  if(flash){flash.classList.remove('flash');void flash.offsetWidth;flash.classList.add('flash');}
+  const overlay=document.getElementById('tdOverlay');
+  if(overlay){overlay.classList.add('show');setTimeout(()=>overlay.classList.remove('show'),3400);}
+  setTimeout(()=>spawnConfetti(),200);
+  setTimeout(()=>spawnConfetti(),700);
+}
+
+// ════════════════════════════════════════
+//  SOUND EFFECTS (Web Audio API — no files needed)
+// ════════════════════════════════════════
+let _ac=null;
+function _audio(){
+  if(!_ac) try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}
+  if(_ac.state==='suspended') _ac.resume();
+  return _ac;
+}
+function playCheer(){
+  const ctx=_audio(); if(!ctx) return;
+  const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*.65),ctx.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length*.6);
+  const src=ctx.createBufferSource(); src.buffer=buf;
+  const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=1300; bpf.Q.value=0.4;
+  const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.18,ctx.currentTime+.08);
+  g.gain.linearRampToValueAtTime(0,ctx.currentTime+.65);
+  src.connect(bpf); bpf.connect(g); g.connect(ctx.destination); src.start();
+}
+function playTDRoar(){
+  const ctx=_audio(); if(!ctx) return;
+  const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*1.3),ctx.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length*.4);
+  const src=ctx.createBufferSource(); src.buffer=buf;
+  const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=900; bpf.Q.value=0.3;
+  const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.3,ctx.currentTime+.1);
+  g.gain.setValueAtTime(0.28,ctx.currentTime+.4);
+  g.gain.linearRampToValueAtTime(0,ctx.currentTime+1.3);
+  src.connect(bpf); bpf.connect(g); g.connect(ctx.destination); src.start();
+}
+function playBoo(){
+  const ctx=_audio(); if(!ctx) return;
+  const osc=ctx.createOscillator(); const g=ctx.createGain();
+  osc.type='sawtooth';
+  osc.frequency.setValueAtTime(200,ctx.currentTime);
+  osc.frequency.linearRampToValueAtTime(130,ctx.currentTime+.5);
+  g.gain.setValueAtTime(0.07,ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0,ctx.currentTime+.55);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(); osc.stop(ctx.currentTime+.55);
+}
+
+// ════════════════════════════════════════
+//  CONFETTI
+// ════════════════════════════════════════
+function spawnConfetti(){
+  const cols=['#0070EB','#FFDC2E','#1BB152','#D22839','#c084fc','#f0ede4'];
+  for(let i=0;i<70;i++){
+    const el=document.createElement('div'); el.className='confetti-p';
+    const sz=6+Math.random()*9;
+    el.style.cssText=`left:${Math.random()*100}vw;top:-20px;width:${sz}px;height:${sz}px;background:${cols[Math.floor(Math.random()*cols.length)]};border-radius:${Math.random()>.5?'50%':'2px'};animation-duration:${1.6+Math.random()*2}s;animation-delay:${Math.random()*.6}s;`;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),3200);
+  }
+}
+</script>
+</body>
+</html>

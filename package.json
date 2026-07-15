@@ -1,0 +1,11 @@
+{
+  "name": "jcoldren-work",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jason Coldren learning archive and portfolio site.",
+  "scripts": {
+    "start": "python3 -m http.server 4173",
+    "deploy:vercel": "npx vercel --prod",
+    "deploy:cloudflare": "npx wrangler pages deploy . --project-name jcoldren-work"
+  }
+}

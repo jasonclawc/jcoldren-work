@@ -1,0 +1,3328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACE Simulator — Alex's First Shift</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ─────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Nunito',sans-serif;
+  background:#1a1a2e;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:16px;
+  gap:12px;
+}
+
+/* ── GAME HUD (above the browser) ───────────────*/
+#hud{
+  width:100%;
+  max-width:1100px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 4px;
+}
+.hud-title{
+  font-family:'Press Start 2P',monospace;
+  font-size:10px;
+  color:#FFDC2E;
+  text-shadow:0 0 10px rgba(255,220,46,.5);
+  line-height:1.9;
+}
+.hud-title span{color:#fff;font-size:8px;display:block;}
+.hud-stats{display:flex;gap:20px;align-items:center;}
+.hud-stat{font-family:'Press Start 2P',monospace;font-size:8px;text-align:right;}
+.hud-stat .lbl{color:#4a5568;margin-bottom:4px;}
+.hud-stat .val{color:#FFDC2E;}
+.hearts{display:flex;gap:3px;}
+.heart{font-size:14px;transition:all .3s;}
+.heart.gone{filter:grayscale(1) opacity(.2);transform:scale(.7);}
+
+/* ── FAKE BROWSER CHROME ─────────────────────── */
+#browser{
+  width:100%;
+  max-width:1100px;
+  border-radius:10px 10px 6px 6px;
+  overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 0 3px #0070EB, 0 0 30px rgba(0,112,235,.2);
+}
+.browser-bar{
+  background:#1e2030;
+  padding:8px 14px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border-bottom:1px solid #2d3148;
+}
+.bdot{width:11px;height:11px;border-radius:50%;}
+.bdot.r{background:#ff5f57;}
+.bdot.y{background:#febc2e;}
+.bdot.g{background:#28c840;}
+.burl{
+  flex:1;background:#12151f;border:1px solid #2d3148;border-radius:5px;
+  padding:4px 12px;font-size:11px;color:#6b7280;font-family:monospace;
+}
+
+/* ── ACE APP SHELL ───────────────────────────── */
+#ace{
+  background:#f3f4f6;
+  display:flex;
+  flex-direction:column;
+  min-height:620px;
+  position:relative;
+}
+
+/* Top nav */
+.ace-topnav{
+  background:#fff;
+  border-bottom:1px solid #e5e7eb;
+  padding:0 16px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  position:relative;
+}
+.ace-shield{
+  width:30px;height:30px;
+  background:#0070EB;
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+  flex-shrink:0;
+  /* cartoon wobble effect */
+  box-shadow:0 3px 0 #004da3, 0 4px 8px rgba(0,112,235,.3);
+}
+.ace-search{
+  flex:1;
+  max-width:360px;
+  background:#f9fafb;
+  border:2px solid #e5e7eb;
+  border-radius:20px;
+  padding:6px 14px 6px 32px;
+  font-size:12px;
+  color:#9ca3af;
+  position:relative;
+  font-family:'Nunito',sans-serif;
+  cursor:default;
+  transition:border-color .2s;
+}
+.ace-search:focus-within{border-color:#0070EB;}
+.ace-search-wrap{position:relative;flex:1;max-width:360px;}
+.ace-search-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;}
+.ace-nav-icons{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.nav-icon{
+  width:30px;height:30px;border-radius:6px;
+  background:#f3f4f6;border:2px solid #e5e7eb;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;cursor:pointer;transition:all .15s;
+  position:relative;
+}
+.nav-icon:hover{background:#e5e7eb;}
+.nav-avatar{
+  width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(135deg,#0070EB,#1BB152);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:800;color:#fff;
+  border:2px solid #0070EB;
+  cursor:pointer;
+}
+
+/* App tabs */
+.ace-tabbar{
+  background:#fff;
+  border-bottom:2px solid #e5e7eb;
+  display:flex;
+  align-items:flex-end;
+  padding:0 16px;
+  gap:4px;
+}
+.ace-appname{
+  font-size:12px;font-weight:800;color:#374151;
+  padding:8px 10px;display:flex;align-items:center;gap:6px;
+}
+.ace-appname .app-dot{
+  width:9px;height:9px;border-radius:3px;background:#0070EB;
+}
+.ace-tab{
+  padding:8px 16px 6px;font-size:12px;font-weight:700;
+  border-bottom:3px solid transparent;cursor:pointer;
+  color:#6b7280;transition:all .15s;
+  display:flex;align-items:center;gap:6px;
+}
+.ace-tab.active{color:#0070EB;border-bottom-color:#0070EB;}
+.ace-tab:hover:not(.active){color:#374151;}
+.tab-count{
+  background:#e5e7eb;border-radius:10px;
+  padding:1px 6px;font-size:10px;color:#6b7280;
+}
+.tab-count.blue{background:#dbeafe;color:#0070EB;}
+
+/* App Launcher */
+.app-launcher-wrap{position:relative;}
+.app-launcher-btn{
+  width:32px;height:32px;margin-bottom:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;color:#6b7280;border-radius:6px;cursor:pointer;
+  transition:all .15s;letter-spacing:-2px;
+}
+.app-launcher-btn:hover,.app-launcher-btn.active{background:#f3f4f6;color:#0070EB;}
+.app-launcher-dropdown{
+  position:absolute;top:calc(100% + 6px);left:0;
+  width:260px;background:#fff;border-radius:10px;
+  box-shadow:0 8px 30px rgba(0,0,0,.18);
+  border:1px solid #e5e7eb;z-index:500;
+  display:none;overflow:hidden;
+}
+.app-launcher-dropdown.open{display:block;}
+.al-header{font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;padding:10px 14px 6px;}
+.al-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .1s;}
+.al-item:hover{background:#f9fafb;}
+.al-featured{background:#eff6ff;border-left:3px solid #0070EB;}
+.al-featured:hover{background:#dbeafe;}
+.al-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.al-name{font-size:12px;font-weight:700;color:#111827;}
+.al-desc{font-size:10px;color:#6b7280;margin-top:1px;}
+.al-divider{height:1px;background:#f3f4f6;margin:4px 0;}
+
+/* Case list header */
+.case-list-header{
+  background:#fff;
+  border-bottom:2px solid #e5e7eb;
+  padding:10px 16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  box-shadow:0 2px 6px rgba(0,0,0,.06);
+}
+.case-list-icon{
+  width:36px;height:36px;flex-shrink:0;
+  background:linear-gradient(145deg,#f59e0b,#d97706);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+  box-shadow:0 3px 0 #b45309, 0 4px 8px rgba(217,119,6,.35);
+}
+.case-list-label{font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px;}
+.case-list-title{font-size:14px;font-weight:900;color:#111827;letter-spacing:-.2px;}
+.case-list-subtitle{font-size:11px;color:#6b7280;margin-top:2px;}
+.case-header-btns{margin-left:auto;display:flex;gap:6px;}
+.case-header-btn{
+  padding:5px 12px;font-size:11px;font-weight:700;
+  border:2px solid #e5e7eb;border-radius:6px;
+  background:#fff;color:#374151;cursor:pointer;
+  font-family:'Nunito',sans-serif;
+  transition:all .15s;
+}
+.case-header-btn:hover{border-color:#0070EB;color:#0070EB;}
+.case-header-btn.primary{background:#0070EB;border-color:#0070EB;color:#fff;}
+.case-header-btn.primary:hover{background:#0058c0;}
+
+/* Search bar row */
+.case-search-row{
+  background:#fff;padding:8px 16px;
+  border-bottom:1px solid #e5e7eb;
+  display:flex;align-items:center;gap:8px;
+}
+.case-search{
+  flex:1;max-width:260px;
+  padding:5px 12px 5px 28px;
+  border:2px solid #e5e7eb;border-radius:6px;
+  font-size:11px;font-family:'Nunito',sans-serif;
+  background:#f9fafb;color:#6b7280;position:relative;
+}
+.case-search-wrap{position:relative;}
+.case-search-wrap::before{content:'🔍';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;}
+.icon-btn{
+  width:28px;height:28px;border:2px solid #e5e7eb;border-radius:6px;
+  background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:12px;cursor:pointer;transition:all .15s;
+}
+.icon-btn:hover{border-color:#0070EB;background:#eff6ff;}
+.filter-btn{
+  margin-left:auto;width:28px;height:28px;border:2px solid #e5e7eb;border-radius:6px;
+  background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:12px;cursor:pointer;
+}
+
+/* Case list body */
+.case-list-body{flex:1;background:#f3f4f6;padding:12px 16px;min-height:340px;}
+.case-list-meta{font-size:11px;color:#9ca3af;margin-bottom:10px;}
+
+/* Individual case row */
+.case-row{
+  background:#fff;
+  border:2px solid #e5e7eb;
+  border-radius:10px;
+  padding:12px 16px;
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  cursor:pointer;
+  transition:all .2s;
+  position:relative;
+  overflow:hidden;
+}
+.case-row::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:#e5e7eb;transition:background .2s;
+}
+.case-row:hover{border-color:#0070EB;box-shadow:0 4px 12px rgba(0,112,235,.1);transform:translateY(-1px);}
+.case-row:hover::before{background:#0070EB;}
+.case-row.urgent::before{background:#ef4444;}
+.case-row.urgent{border-color:#fecaca;}
+.case-row.new-pulse{animation:newPulse 2s ease infinite;}
+@keyframes newPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,112,235,.3);}50%{box-shadow:0 0 0 6px rgba(0,112,235,.0);}}
+
+.case-channel{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.case-channel.email{background:#dbeafe;}
+.case-channel.chat{background:#d1fae5;}
+.case-info{flex:1;}
+.case-customer{font-size:12px;font-weight:800;color:#111827;}
+.case-subject{font-size:11px;color:#6b7280;margin-top:2px;}
+.case-meta{font-size:10px;color:#9ca3af;margin-top:3px;}
+.case-badge{
+  font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;flex-shrink:0;
+}
+.badge-new{background:#dbeafe;color:#1d4ed8;}
+.badge-open{background:#fef3c7;color:#92400e;}
+.badge-pending{background:#f3e8ff;color:#6d28d9;}
+.badge-urgent{background:#fee2e2;color:#b91c1c;}
+.case-time{font-size:10px;color:#9ca3af;flex-shrink:0;}
+
+/* ── CASE DETAIL VIEW ────────────────────────── */
+.case-detail{display:flex;flex-direction:column;flex:1;}
+.detail-header{
+  background:#fff;border-bottom:1px solid #e5e7eb;
+  padding:10px 16px;display:flex;align-items:center;gap:10px;
+}
+.back-btn{
+  padding:4px 10px;font-size:11px;font-weight:700;
+  border:2px solid #e5e7eb;border-radius:6px;
+  background:#fff;color:#6b7280;cursor:pointer;
+  font-family:'Nunito',sans-serif;transition:all .15s;
+}
+.back-btn:hover{border-color:#6b7280;color:#374151;}
+.detail-case-id{font-size:12px;font-weight:800;color:#374151;}
+.detail-status-badge{
+  font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;margin-left:4px;
+}
+.detail-body{display:flex;flex:1;min-height:420px;}
+
+/* Left column — feed */
+.feed-col{
+  flex:1;
+  background:#f9fafb;
+  border-right:1px solid #e5e7eb;
+  display:flex;flex-direction:column;
+}
+.feed-tabs{
+  background:#fff;border-bottom:1px solid #e5e7eb;
+  display:flex;padding:0 12px;
+}
+.feed-tab{
+  padding:8px 14px 6px;font-size:11px;font-weight:700;
+  border-bottom:3px solid transparent;cursor:pointer;color:#6b7280;
+}
+.feed-tab.active{color:#0070EB;border-bottom-color:#0070EB;}
+.feed-messages{padding:12px;display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto;max-height:260px;}
+
+/* Incoming message bubble */
+.msg-in{
+  background:#fff;border:1px solid #e5e7eb;border-radius:10px 10px 10px 2px;
+  padding:10px 14px;max-width:80%;align-self:flex-start;
+}
+.msg-in .msg-sender{font-size:10px;font-weight:800;color:#0070EB;margin-bottom:4px;}
+.msg-in .msg-text{font-size:12px;color:#374151;line-height:1.6;}
+
+/* Agent compose area */
+.compose-area{
+  background:#fff;
+  border-top:2px solid #e5e7eb;
+  padding:10px 12px;
+}
+.compose-toolbar{
+  display:flex;gap:6px;margin-bottom:8px;padding-bottom:8px;
+  border-bottom:1px solid #f3f4f6;
+}
+.toolbar-btn{
+  width:26px;height:26px;border:1px solid #e5e7eb;border-radius:4px;
+  background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:11px;cursor:pointer;transition:all .15s;
+}
+.toolbar-btn:hover{background:#eff6ff;border-color:#0070EB;}
+.toolbar-sep{width:1px;background:#e5e7eb;margin:0 2px;}
+.template-btn{
+  padding:3px 10px;font-size:10px;font-weight:700;
+  border:2px solid #0070EB;border-radius:5px;
+  background:#eff6ff;color:#0070EB;cursor:pointer;
+  font-family:'Nunito',sans-serif;transition:all .15s;
+}
+.template-btn:hover{background:#0070EB;color:#fff;}
+.compose-field{
+  width:100%;min-height:60px;
+  border:2px solid #e5e7eb;border-radius:8px;
+  padding:8px 12px;font-size:12px;
+  font-family:'Nunito',sans-serif;
+  color:#374151;resize:none;outline:none;
+  transition:border-color .2s;
+  line-height:1.6;
+}
+.compose-field:focus{border-color:#0070EB;}
+.compose-field.highlight-error{border-color:#ef4444;animation:errorShake .3s ease;}
+@keyframes errorShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+.compose-footer{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.send-btn{
+  padding:6px 18px;font-size:12px;font-weight:800;
+  background:#0070EB;color:#fff;border:none;border-radius:8px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 3px 0 #004da3;transition:all .15s;
+}
+.send-btn:hover{background:#0058c0;transform:translateY(-1px);box-shadow:0 4px 0 #004da3;}
+.send-btn:active{transform:translateY(1px);box-shadow:0 2px 0 #004da3;}
+.attach-btn{
+  padding:6px 12px;font-size:11px;font-weight:700;
+  border:2px solid #e5e7eb;border-radius:8px;
+  background:#fff;color:#6b7280;cursor:pointer;
+  font-family:'Nunito',sans-serif;
+}
+.sig-line{font-size:10px;color:#9ca3af;margin-left:auto;font-style:italic;}
+
+/* Right column — details panel */
+.detail-col{
+  width:260px;
+  background:#fff;
+  display:flex;flex-direction:column;
+  overflow-y:auto;
+}
+.detail-section{padding:12px 14px;border-bottom:1px solid #f3f4f6;}
+.detail-section-title{
+  font-size:10px;font-weight:800;color:#9ca3af;
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;
+}
+.detail-field{margin-bottom:8px;}
+.detail-field-label{font-size:10px;color:#9ca3af;margin-bottom:2px;}
+.detail-field-value{font-size:12px;font-weight:700;color:#374151;}
+.detail-field-value.clickable{color:#0070EB;cursor:pointer;text-decoration:underline;}
+
+/* Status dropdown */
+.status-select{
+  width:100%;padding:6px 10px;
+  border:2px solid #e5e7eb;border-radius:6px;
+  font-size:12px;font-weight:700;font-family:'Nunito',sans-serif;
+  color:#374151;background:#fff;cursor:pointer;
+  outline:none;transition:border-color .2s;
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 8px center;
+}
+.status-select:focus{border-color:#0070EB;}
+
+.solve-btn{
+  width:100%;padding:8px;font-size:12px;font-weight:800;
+  background:#1BB152;color:#fff;border:none;border-radius:8px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 3px 0 #0f7a33;transition:all .15s;margin-top:8px;
+}
+.solve-btn:hover{background:#15a046;transform:translateY(-1px);}
+.solve-btn:active{transform:translateY(1px);box-shadow:0 2px 0 #0f7a33;}
+.solve-btn:disabled{background:#d1d5db;box-shadow:none;cursor:not-allowed;transform:none;}
+
+.internal-note-area{
+  width:100%;min-height:50px;
+  border:2px solid #e5e7eb;border-radius:6px;
+  padding:6px 8px;font-size:11px;
+  font-family:'Nunito',sans-serif;
+  color:#374151;resize:none;outline:none;
+  transition:border-color .2s;margin-top:6px;
+}
+.internal-note-area:focus{border-color:#0070EB;}
+.internal-note-area.required-pulse{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15);}
+.note-submit{
+  padding:5px 12px;font-size:11px;font-weight:700;
+  background:#f3f4f6;border:2px solid #e5e7eb;border-radius:6px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  transition:all .15s;margin-top:6px;
+}
+.note-submit:hover{border-color:#0070EB;background:#eff6ff;color:#0070EB;}
+
+/* ── CHAT VIEW ───────────────────────────────── */
+.chat-view{
+  display:flex;flex:1;flex-direction:column;
+  background:#f9fafb;min-height:420px;
+}
+.chat-header{
+  background:#fff;border-bottom:1px solid #e5e7eb;
+  padding:10px 16px;display:flex;align-items:center;gap:10px;
+}
+.chat-customer-avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,#7c3aed,#db2777);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:800;color:#fff;
+}
+.chat-customer-name{font-size:13px;font-weight:800;color:#111827;}
+.chat-customer-sub{font-size:10px;color:#6b7280;}
+.chat-status-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:#1BB152;margin-left:auto;
+  box-shadow:0 0 0 3px rgba(27,177,82,.2);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(27,177,82,.2);}50%{box-shadow:0 0 0 6px rgba(27,177,82,.0);}}
+
+.chat-messages{flex:1;padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:280px;}
+.chat-msg-customer{align-self:flex-start;max-width:70%;}
+.chat-msg-agent{align-self:flex-end;max-width:70%;}
+.chat-bubble-customer{
+  background:#fff;border:1px solid #e5e7eb;border-radius:14px 14px 14px 2px;
+  padding:10px 14px;font-size:12px;color:#374151;line-height:1.6;
+}
+.chat-bubble-agent{
+  background:#0070EB;border-radius:14px 14px 2px 14px;
+  padding:10px 14px;font-size:12px;color:#fff;line-height:1.6;
+}
+.chat-time{font-size:10px;color:#9ca3af;margin-top:3px;text-align:right;}
+.chat-time.left{text-align:left;}
+
+.chat-compose{
+  background:#fff;border-top:2px solid #e5e7eb;
+  padding:10px 14px;display:flex;gap:8px;align-items:flex-end;
+}
+.chat-input{
+  flex:1;border:2px solid #e5e7eb;border-radius:20px;
+  padding:8px 14px;font-size:12px;font-family:'Nunito',sans-serif;
+  color:#374151;resize:none;outline:none;min-height:38px;max-height:80px;
+  transition:border-color .2s;
+}
+.chat-input:focus{border-color:#0070EB;}
+.chat-send{
+  width:36px;height:36px;border-radius:50%;
+  background:#0070EB;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:all .15s;flex-shrink:0;
+  box-shadow:0 2px 0 #004da3;
+}
+.chat-send:hover{background:#0058c0;transform:scale(1.05);}
+
+/* ── BOTTOM BAR (Omni-Channel) ───────────────── */
+.ace-bottombar{
+  background:#fff;
+  border-top:2px solid #e5e7eb;
+  padding:0 16px;
+  height:40px;
+  display:flex;
+  align-items:center;
+  gap:20px;
+  position:relative;
+}
+.bottombar-item{
+  font-size:11px;font-weight:700;color:#6b7280;
+  display:flex;align-items:center;gap:5px;cursor:pointer;
+  transition:color .15s;padding:0 4px;height:100%;
+  border-top:3px solid transparent;
+  position:relative;
+}
+.bottombar-item:hover{color:#0070EB;}
+.bottombar-item.active{color:#0070EB;border-top-color:#0070EB;}
+
+/* Omni-channel status pill */
+.omni-status{
+  display:flex;align-items:center;gap:6px;
+  background:#f3f4f6;border:2px solid #e5e7eb;border-radius:20px;
+  padding:3px 10px 3px 8px;cursor:pointer;transition:all .15s;
+  font-size:11px;font-weight:700;color:#374151;
+  position:relative;
+}
+.omni-status:hover{border-color:#0070EB;}
+.omni-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.omni-dot.available{background:#1BB152;box-shadow:0 0 0 2px rgba(27,177,82,.3);}
+.omni-dot.offline{background:#9ca3af;}
+.omni-dot.busy{background:#f59e0b;}
+.omni-dot.break{background:#f59e0b;}
+
+/* Status dropdown popup */
+.omni-dropdown{
+  position:absolute;bottom:44px;left:0;
+  background:#fff;border:2px solid #e5e7eb;border-radius:10px;
+  padding:6px;min-width:180px;
+  box-shadow:0 -8px 24px rgba(0,0,0,.12);
+  display:none;z-index:100;
+}
+.omni-dropdown.open{display:block;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.omni-option{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 10px;border-radius:6px;cursor:pointer;
+  font-size:12px;font-weight:700;color:#374151;transition:background .15s;
+}
+.omni-option:hover{background:#f3f4f6;}
+.omni-option.selected{background:#eff6ff;color:#0070EB;}
+
+/* ── COACH TIP OVERLAY ───────────────────────── */
+.coach-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);
+  display:flex;align-items:flex-end;justify-content:center;
+  z-index:500;padding:20px;
+  animation:fadeIn .2s ease;
+}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.coach-box{
+  background:#fff;border-radius:16px 16px 16px 4px;
+  padding:20px 24px;max-width:500px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+  display:flex;gap:16px;align-items:flex-start;
+  animation:slideUp .25s ease;
+  position:relative;
+}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.coach-box.error{border-top:5px solid #ef4444;}
+.coach-box.success{border-top:5px solid #1BB152;}
+.coach-box.info{border-top:5px solid #0070EB;}
+.coach-avatar{
+  width:52px;height:52px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;
+  /* cartoon style */
+}
+.coach-box.error   .coach-avatar{background:#fee2e2;}
+.coach-box.success .coach-avatar{background:#d1fae5;}
+.coach-box.info    .coach-avatar{background:#dbeafe;}
+.coach-body{flex:1;}
+.coach-title{font-size:14px;font-weight:900;color:#111827;margin-bottom:6px;}
+.coach-box.error   .coach-title{color:#b91c1c;}
+.coach-box.success .coach-title{color:#065f46;}
+.coach-box.info    .coach-title{color:#1d4ed8;}
+.coach-text{font-size:13px;color:#374151;line-height:1.65;}
+.coach-text b{color:#111827;}
+.coach-btn{
+  margin-top:12px;padding:8px 20px;font-size:13px;font-weight:800;
+  border:none;border-radius:8px;cursor:pointer;
+  font-family:'Nunito',sans-serif;transition:all .15s;
+}
+.coach-box.error   .coach-btn{background:#ef4444;color:#fff;}
+.coach-box.success .coach-btn{background:#1BB152;color:#fff;}
+.coach-box.info    .coach-btn{background:#0070EB;color:#fff;}
+.coach-btn:hover{opacity:.9;transform:translateY(-1px);}
+.xp-badge{
+  position:absolute;top:-12px;right:16px;
+  font-family:'Press Start 2P',monospace;font-size:9px;
+  background:#FFDC2E;color:#1a1a2e;
+  padding:4px 10px;border-radius:20px;
+  box-shadow:0 2px 8px rgba(255,220,46,.4);
+  animation:xpPop .4s ease;
+}
+@keyframes xpPop{0%{transform:scale(0) rotate(-10deg);opacity:0;}60%{transform:scale(1.2) rotate(3deg);}100%{transform:scale(1) rotate(0);opacity:1;}}
+
+/* ── SCENARIO INTRO ──────────────────────────── */
+.scenario-intro{
+  position:absolute;inset:0;background:rgba(10,14,26,.92);
+  display:flex;align-items:center;justify-content:center;
+  z-index:200;padding:20px;
+  animation:fadeIn .3s ease;
+}
+.scenario-card{
+  background:#fff;border-radius:16px;
+  padding:28px 32px;max-width:480px;width:100%;
+  text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  border:3px solid #0070EB;
+}
+.scenario-emoji{font-size:48px;margin-bottom:12px;display:block;}
+.scenario-act{
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  color:#0070EB;margin-bottom:8px;letter-spacing:1px;
+}
+.scenario-title{font-size:20px;font-weight:900;color:#111827;margin-bottom:10px;line-height:1.3;}
+.scenario-desc{font-size:13px;color:#6b7280;line-height:1.7;margin-bottom:20px;}
+.scenario-start{
+  padding:12px 28px;font-size:14px;font-weight:800;
+  background:#0070EB;color:#fff;border:none;border-radius:10px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 4px 0 #004da3;transition:all .15s;
+}
+.scenario-start:hover{background:#0058c0;transform:translateY(-2px);box-shadow:0 6px 0 #004da3;}
+
+/* Hint tooltip */
+.hint{
+  position:absolute;
+  background:#1a1a2e;color:#fff;
+  font-size:11px;font-weight:700;
+  padding:6px 12px;border-radius:6px;
+  pointer-events:none;z-index:300;
+  white-space:nowrap;
+  animation:fadeIn .2s ease;
+}
+.hint::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#1a1a2e;
+}
+
+/* ── GLOW EFFECTS for clickable items ────────── */
+.needs-click{
+  position:relative;
+  animation:glowPulse 1.5s ease infinite;
+}
+@keyframes glowPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(0,112,235,.4);}
+  50%{box-shadow:0 0 0 8px rgba(0,112,235,.0);}
+}
+.needs-click::after{
+  content:'👆';
+  position:absolute;top:-18px;right:-6px;
+  font-size:14px;animation:bounce .8s ease infinite;
+  pointer-events:none;z-index:10;
+}
+@keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+
+/* Progress bar */
+.progress-track{width:100%;max-width:1100px;display:flex;align-items:center;gap:10px;}
+.prog-lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:#4a5568;white-space:nowrap;}
+.prog-bar{flex:1;height:6px;background:#1e2030;border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,#0070EB,#1BB152);transition:width .6s ease;border-radius:3px;}
+
+/* ── SCENARIO SELECT MENU ───────────────────────── */
+.scenario-menu{
+  position:absolute;inset:0;background:rgba(10,14,26,.96);
+  display:flex;align-items:center;justify-content:center;
+  z-index:200;padding:16px;overflow-y:auto;
+  animation:fadeIn .3s ease;
+}
+.scenario-menu-box{
+  background:#fff;border-radius:16px;padding:22px 24px;
+  max-width:620px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);border:3px solid #0070EB;
+}
+.scenario-menu-title{font-family:'Press Start 2P',monospace;font-size:9px;color:#0070EB;margin-bottom:4px;text-align:center;}
+.scenario-menu-sub{font-size:12px;color:#6b7280;text-align:center;margin-bottom:14px;}
+.scenario-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.scenario-tile{border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;background:#f9fafb;}
+.scenario-tile:hover{border-color:#0070EB;background:#eff6ff;transform:translateY(-2px);}
+.scenario-tile-emoji{font-size:18px;margin-bottom:3px;}
+.scenario-tile-act{font-size:8px;font-family:'Press Start 2P',monospace;color:#9ca3af;margin-bottom:3px;}
+.scenario-tile-title{font-size:11px;font-weight:800;color:#111827;}
+.scenario-menu-start{width:100%;padding:11px;font-size:13px;font-weight:800;background:#0070EB;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:'Nunito',sans-serif;box-shadow:0 4px 0 #004da3;transition:all .15s;}
+.scenario-menu-start:hover{background:#0058c0;transform:translateY(-2px);}
+
+/* ── BONUS BET PANEL ─────────────────────────────── */
+.bonus-panel{width:210px;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+.bonus-panel-header{background:linear-gradient(135deg,#0070EB,#1BB152);padding:10px 12px;}
+.bonus-panel-title{font-size:12px;font-weight:900;color:#fff;}
+.bonus-panel-sub{font-size:10px;color:rgba(255,255,255,.75);margin-top:2px;}
+.bonus-panel-body{padding:12px;display:flex;flex-direction:column;gap:10px;}
+.bb-field{display:flex;flex-direction:column;gap:4px;}
+.bb-label{font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;}
+.bb-select,.bb-input{width:100%;padding:7px 10px;border:2px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:'Nunito',sans-serif;color:#374151;outline:none;transition:border-color .2s;background:#fff;}
+.bb-select:focus,.bb-input:focus{border-color:#0070EB;}
+.bb-apply{width:100%;padding:8px;font-size:12px;font-weight:800;background:#0070EB;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Nunito',sans-serif;box-shadow:0 3px 0 #004da3;transition:all .15s;}
+.bb-apply:hover{background:#0058c0;transform:translateY(-1px);}
+.bb-confirmation{background:#f0fdf4;border:2px solid #1BB152;border-radius:8px;padding:10px;display:none;}
+.bb-conf-title{font-size:11px;font-weight:800;color:#065f46;margin-bottom:6px;}
+.bb-conf-row{font-size:11px;color:#374151;margin-bottom:3px;}
+.bb-conf-btns{display:flex;gap:6px;margin-top:8px;}
+.bb-conf-confirm{flex:1;padding:6px;font-size:11px;font-weight:800;background:#1BB152;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'Nunito',sans-serif;}
+.bb-conf-cancel{flex:1;padding:6px;font-size:11px;font-weight:700;background:#fff;border:2px solid #e5e7eb;color:#6b7280;border-radius:6px;cursor:pointer;font-family:'Nunito',sans-serif;}
+.bb-applied-badge{background:#f0fdf4;border:2px solid #1BB152;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:800;color:#065f46;text-align:center;}
+
+/* ── ALLEY-OOP PANEL ─────────────────────────────── */
+.ao-panel{position:absolute;bottom:40px;left:0;right:0;background:#fff;border-top:3px solid #7c3aed;max-height:260px;display:flex;flex-direction:column;z-index:50;box-shadow:0 -8px 24px rgba(0,0,0,.15);animation:slideUp .25s ease;}
+.ao-header{background:#7c3aed;padding:8px 14px;display:flex;align-items:center;gap:8px;}
+.ao-title{font-size:12px;font-weight:900;color:#fff;flex:1;}
+.ao-close{background:none;border:none;color:rgba(255,255,255,.7);font-size:14px;cursor:pointer;padding:0 4px;}
+.ao-body{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;}
+.ao-msg-agent{align-self:flex-end;max-width:75%;}
+.ao-msg-specialist{align-self:flex-start;max-width:75%;}
+.ao-bubble-agent{background:#7c3aed;border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:12px;color:#fff;}
+.ao-bubble-specialist{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px 12px 12px 2px;padding:8px 12px;font-size:12px;color:#374151;}
+.ao-bubble-system{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:11px;color:#92400e;text-align:center;}
+.ao-time{font-size:10px;color:#9ca3af;margin-top:2px;}
+.ao-compose{background:#f9fafb;border-top:1px solid #e5e7eb;padding:8px 12px;display:flex;gap:8px;align-items:center;}
+.ao-input{flex:1;border:2px solid #e5e7eb;border-radius:16px;padding:6px 12px;font-size:12px;font-family:'Nunito',sans-serif;outline:none;transition:border-color .2s;}
+.ao-input:focus{border-color:#7c3aed;}
+.ao-send{width:32px;height:32px;border-radius:50%;background:#7c3aed;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.ao-connecting{text-align:center;padding:16px;color:#7c3aed;}
+.ao-connecting-dots span{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7c3aed;margin:0 2px;animation:dotBounce 1.2s ease infinite;}
+.ao-connecting-dots span:nth-child(2){animation-delay:.2s;}
+.ao-connecting-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dotBounce{0%,80%,100%{transform:scale(0);}40%{transform:scale(1);}}
+.ao-skip-btn{margin-top:8px;padding:5px 14px;font-size:11px;font-weight:700;background:#fff;border:2px solid #e5e7eb;border-radius:6px;cursor:pointer;font-family:'Nunito',sans-serif;transition:all .15s;}
+.ao-skip-btn:hover{border-color:#7c3aed;color:#7c3aed;}
+
+/* ── SUPERVISOR MESSAGE ──────────────────────────── */
+.msg-supervisor{background:#fef9c3;border:1px solid #fde047;border-radius:10px 10px 10px 2px;padding:10px 14px;max-width:85%;align-self:flex-start;}
+.msg-supervisor .msg-sender{font-size:10px;font-weight:800;color:#854d0e;margin-bottom:4px;}
+.msg-supervisor .msg-text{font-size:12px;color:#713f12;line-height:1.6;}
+
+/* ── REFRESH BUTTON ──────────────────────────────── */
+.refresh-btn{padding:4px 10px;font-size:11px;font-weight:700;background:#eff6ff;border:2px solid #0070EB;border-radius:6px;color:#0070EB;cursor:pointer;font-family:'Nunito',sans-serif;transition:all .15s;display:flex;align-items:center;gap:4px;}
+.refresh-btn:hover{background:#0070EB;color:#fff;}
+.refresh-btn.refreshing{opacity:.6;pointer-events:none;}
+
+/* ── SCORE CARD ──────────────────────────────────── */
+.score-card{background:#fff;border:3px solid #1BB152;border-radius:16px;padding:20px 24px;max-width:440px;width:100%;box-shadow:0 8px 24px rgba(27,177,82,.15);}
+.score-grade-badge{font-family:'Press Start 2P',monospace;font-size:9px;color:#1BB152;background:#f0fdf4;padding:5px 12px;border-radius:20px;display:inline-block;margin:6px 0;}
+.score-actions{display:flex;gap:8px;margin-top:16px;}
+.score-btn{flex:1;padding:8px 10px;font-size:12px;font-weight:800;border:2px solid #e5e7eb;border-radius:8px;background:#fff;color:#374151;cursor:pointer;font-family:'Nunito',sans-serif;transition:all .15s;}
+.score-btn:hover{border-color:#0070EB;color:#0070EB;background:#eff6ff;}
+.score-btn.green{background:#1BB152;border-color:#1BB152;color:#fff;}
+.score-btn.green:hover{background:#15a046;}
+.omni-dot.green{background:#1BB152;box-shadow:0 0 0 2px rgba(27,177,82,.3);}
+.omni-dot.orange{background:#f97316;}
+
+/* ── PIN OVERLAY ─────────────────────────────────── */
+#pin-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(3px);
+}
+#pin-box{
+  background:#1e2030;border:2px solid #7c3aed;border-radius:16px;
+  padding:32px 28px;width:280px;text-align:center;
+  box-shadow:0 0 40px rgba(124,58,237,.4);
+}
+#pin-icon{font-size:36px;margin-bottom:10px;}
+#pin-title{font-family:'Press Start 2P',monospace;font-size:11px;color:#a78bfa;margin-bottom:6px;}
+#pin-subtitle{font-size:12px;color:rgba(255,255,255,.55);margin-bottom:20px;}
+#pin-input{
+  width:100%;box-sizing:border-box;
+  background:#0f172a;border:2px solid #374151;border-radius:8px;
+  color:#fff;font-size:28px;letter-spacing:8px;text-align:center;
+  padding:10px 12px;outline:none;
+  transition:border-color .15s;
+}
+#pin-input:focus{border-color:#7c3aed;}
+#pin-error{color:#f87171;font-size:11px;margin-top:8px;}
+#pin-btns{display:flex;gap:10px;margin-top:18px;}
+.pin-btn{flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;}
+.pin-btn.cancel{background:#374151;color:#9ca3af;}
+.pin-btn.cancel:hover{background:#4b5563;}
+.pin-btn.confirm{background:#7c3aed;color:#fff;box-shadow:0 0 10px rgba(124,58,237,.4);}
+.pin-btn.confirm:hover{background:#6d28d9;}
+@keyframes pinShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.pin-shake{animation:pinShake .35s ease;}
+
+/* ── FACILITATOR MODE ────────────────────────────── */
+.fac-toggle{
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  padding:5px 9px;background:#1e2030;color:#4a5568;
+  border:2px solid #2d3148;border-radius:6px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.fac-toggle.on{background:#7c3aed;color:#fff;border-color:#7c3aed;box-shadow:0 0 12px rgba(124,58,237,.4);}
+.fac-toggle:hover{border-color:#7c3aed;color:#7c3aed;}
+
+/* ── Trainer panel: default (side drawer) ─────── */
+#fac-panel{
+  position:fixed;top:0;right:-380px;width:360px;height:100vh;
+  background:#0f172a;color:#fff;z-index:900;
+  display:flex;flex-direction:column;
+  box-shadow:-4px 0 24px rgba(0,0,0,.5);
+  transition:right .35s ease;overflow-y:auto;
+}
+#fac-panel.open{right:0;}
+
+/* ── Trainer panel: presentation mode (inline column) */
+body.trainer-presentation #fac-panel{
+  position:static;right:auto;width:380px;height:auto;
+  min-height:100vh;flex-shrink:0;box-shadow:none;
+  border-left:3px solid #7c3aed;
+  transition:none;overflow-y:visible;
+}
+body.trainer-presentation{
+  display:flex;flex-direction:row;align-items:flex-start;
+}
+body.trainer-presentation #hud{
+  position:sticky;top:0;z-index:800;
+  width:100%;order:-2;
+  flex-shrink:0;
+}
+body.trainer-presentation #browser{
+  flex:1;min-width:0;
+}
+
+/* Panel internals — shared styles */
+.fac-header{background:#7c3aed;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.fac-header-title{font-family:'Press Start 2P',monospace;font-size:8px;color:#fff;flex:1;line-height:1.9;}
+.fac-close{background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;padding:0;}
+.fac-scenario-strip{background:rgba(124,58,237,.3);padding:12px 18px;flex-shrink:0;}
+.fac-scenario-act{font-size:11px;font-weight:800;color:#a78bfa;margin-bottom:3px;}
+.fac-scenario-title{font-size:15px;font-weight:900;color:#fff;}
+.fac-section{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);}
+.fac-section-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.fac-section-label.yellow{color:#FFDC2E;}
+.fac-section-label.red{color:#f87171;}
+.fac-section-label.blue{color:#60a5fa;}
+.fac-point{font-size:13px;color:rgba(255,255,255,.88);line-height:1.7;margin-bottom:8px;padding-left:16px;position:relative;}
+.fac-point::before{content:'›';position:absolute;left:0;color:#a78bfa;font-weight:800;font-size:15px;}
+.fac-mistake{font-size:13px;color:#fca5a5;line-height:1.7;margin-bottom:8px;padding-left:20px;position:relative;}
+.fac-mistake::before{content:'✕';position:absolute;left:0;font-size:11px;top:3px;}
+.fac-watch{background:rgba(255,220,46,.08);border:1px solid rgba(255,220,46,.25);border-radius:6px;padding:10px 12px;font-size:13px;color:#fef08a;line-height:1.65;}
+
+/* Presentation-mode enlargement */
+body.trainer-presentation .fac-point,
+body.trainer-presentation .fac-mistake,
+body.trainer-presentation .fac-watch{font-size:15px;line-height:1.75;}
+body.trainer-presentation .fac-section-label{font-size:11px;}
+body.trainer-presentation .fac-scenario-title{font-size:17px;}
+body.trainer-presentation .fac-point{margin-bottom:12px;}
+body.trainer-presentation .fac-section{padding:16px 20px;}
+
+/* Discussion prompt on scenario intro */
+.discussion-prompt{
+  background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;
+  padding:10px 14px;margin-bottom:14px;text-align:left;
+}
+.discussion-prompt-label{font-size:9px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:flex;align-items:center;gap:5px;}
+.discussion-prompt-q{font-size:12px;color:#1e3a5f;line-height:1.6;font-style:italic;}
+
+/* Debrief overlay */
+.debrief-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  display:flex;align-items:center;justify-content:center;
+  z-index:600;padding:20px;animation:fadeIn .25s ease;
+}
+.debrief-card{
+  background:#0f172a;border:3px solid #7c3aed;border-radius:16px;
+  padding:24px 26px;max-width:520px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.debrief-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.debrief-emoji{font-size:26px;}
+.debrief-title{font-family:'Press Start 2P',monospace;font-size:8px;color:#FFDC2E;line-height:1.9;}
+.debrief-points{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.debrief-point{background:rgba(255,255,255,.05);border-radius:8px;padding:9px 12px 9px 36px;font-size:12px;color:rgba(255,255,255,.88);line-height:1.6;position:relative;}
+.debrief-point::before{content:'✅';position:absolute;left:10px;top:9px;font-size:12px;}
+.debrief-q-box{background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.5);border-radius:10px;padding:11px 14px;margin-bottom:14px;}
+.debrief-q-label{font-size:9px;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.debrief-q-text{font-size:13px;color:#c4b5fd;line-height:1.65;font-style:italic;}
+.debrief-continue{width:100%;padding:11px;font-size:13px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:'Nunito',sans-serif;box-shadow:0 4px 0 #5b21b6;transition:all .15s;}
+.debrief-continue:hover{background:#6d28d9;transform:translateY(-2px);}
+
+/* ── PAUSE + DISCUSSION OVERLAY ──────────────────── */
+.pause-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.72);
+  display:flex;align-items:center;justify-content:center;
+  z-index:700;padding:20px;animation:fadeIn .2s ease;
+  backdrop-filter:blur(2px);
+}
+.pause-card{
+  background:#0f172a;border:3px solid #FFDC2E;border-radius:16px;
+  padding:26px 28px;max-width:560px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 0 1px rgba(255,220,46,.15);
+}
+.pause-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.pause-label{font-family:'Press Start 2P',monospace;font-size:8px;color:#FFDC2E;line-height:1.9;flex:1;}
+.pause-step{font-size:11px;color:rgba(255,255,255,.4);font-weight:700;}
+.pause-trigger{font-size:11px;font-weight:800;color:rgba(255,220,46,.6);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+.pause-question{
+  font-size:16px;font-weight:800;color:#fff;line-height:1.6;
+  margin-bottom:14px;
+}
+.pause-context{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;
+  padding:10px 14px;font-size:13px;color:rgba(255,255,255,.65);line-height:1.65;
+  margin-bottom:16px;
+}
+.pause-context-label{font-size:9px;font-weight:800;color:#FFDC2E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.pause-footer{display:flex;gap:8px;align-items:center;}
+.pause-resume{
+  flex:1;padding:11px;font-size:13px;font-weight:800;
+  background:#FFDC2E;color:#1a1a2e;border:none;border-radius:10px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 4px 0 #b8960a;transition:all .15s;
+}
+.pause-resume:hover{background:#ffe55a;transform:translateY(-2px);}
+.pause-next{
+  padding:11px 16px;font-size:12px;font-weight:800;
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);
+  color:rgba(255,255,255,.7);border-radius:10px;cursor:pointer;
+  font-family:'Nunito',sans-serif;transition:all .15s;white-space:nowrap;
+}
+.pause-next:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);}
+.pause-dots{display:flex;gap:5px;align-items:center;}
+.pause-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .2s;}
+.pause-dot.active{background:#FFDC2E;}
+
+/* ── SLIDE DECK OVERLAY ──────────────────────────── */
+#slides-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:#0a0e1a;
+  display:flex;flex-direction:column;
+  transition:opacity .3s ease, transform .3s ease;
+}
+#slides-overlay.sim-mode{
+  opacity:0;pointer-events:none;transform:scale(.97);
+}
+.slides-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;background:rgba(255,255,255,.03);
+  border-bottom:1px solid rgba(255,255,255,.07);
+  flex-shrink:0;
+}
+.slides-scenario-label{
+  font-family:'Press Start 2P',monospace;font-size:7px;color:#a78bfa;line-height:1.9;
+}
+.slides-show-sim{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;font-size:12px;font-weight:800;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  color:rgba(255,255,255,.7);border-radius:8px;cursor:pointer;
+  font-family:'Nunito',sans-serif;transition:all .15s;
+}
+.slides-show-sim:hover{background:rgba(255,255,255,.14);color:#fff;}
+.slides-close-btn{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.5);cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.slides-close-btn:hover{background:rgba(239,68,68,.2);border-color:#ef4444;color:#f87171;}
+
+/* Main slide stage */
+.slides-stage{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  padding:32px 48px;position:relative;overflow:hidden;
+}
+.slide{
+  width:100%;max-width:820px;text-align:center;
+  animation:slideFadeIn .25s ease;
+}
+@keyframes slideFadeIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* Slide type chip */
+.slide-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
+  padding:5px 14px;border-radius:20px;margin-bottom:24px;
+}
+.chip-intro{background:rgba(0,112,235,.2);color:#60a5fa;border:1px solid rgba(0,112,235,.3);}
+.chip-point{background:rgba(255,220,46,.12);color:#FFDC2E;border:1px solid rgba(255,220,46,.25);}
+.chip-mistake{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);}
+.chip-watch{background:rgba(0,112,235,.12);color:#60a5fa;border:1px solid rgba(0,112,235,.25);}
+.chip-discussion{background:rgba(124,58,237,.15);color:#c4b5fd;border:1px solid rgba(124,58,237,.3);}
+
+/* Slide content types */
+.slide-emoji{font-size:72px;display:block;margin-bottom:16px;line-height:1;}
+.slide-act{
+  font-family:'Press Start 2P',monospace;font-size:9px;color:#FFDC2E;
+  margin-bottom:14px;letter-spacing:1px;
+}
+.slide-title{
+  font-size:34px;font-weight:900;color:#fff;line-height:1.25;
+  margin-bottom:12px;letter-spacing:-.5px;
+}
+.slide-desc{font-size:16px;color:rgba(255,255,255,.55);line-height:1.7;max-width:600px;margin:0 auto;}
+
+/* Key point slide */
+.slide-accent-bar{
+  width:5px;border-radius:3px;position:absolute;left:0;top:20%;bottom:20%;
+}
+.slide-point-text{
+  font-size:24px;font-weight:800;color:#fff;line-height:1.55;
+  max-width:700px;margin:0 auto;
+}
+.slide-point-text b{color:#FFDC2E;}
+.slide-point-text em{color:#60a5fa;font-style:normal;}
+
+/* Mistake slide */
+.slide-mistake-icon{font-size:52px;margin-bottom:16px;display:block;}
+.slide-mistake-text{
+  font-size:22px;font-weight:800;color:#fca5a5;line-height:1.55;
+  max-width:660px;margin:0 auto;
+}
+.slide-mistake-text b{color:#f87171;}
+
+/* Watch for slide */
+.slide-watch-text{
+  font-size:22px;color:rgba(255,255,255,.85);line-height:1.65;
+  max-width:660px;margin:0 auto;font-style:italic;
+}
+
+/* Discussion slide */
+.slide-discussion-header{
+  font-family:'Press Start 2P',monospace;font-size:9px;color:#c4b5fd;
+  margin-bottom:20px;letter-spacing:.8px;
+}
+.slide-discussion-q{
+  font-size:26px;font-weight:800;color:#fff;line-height:1.5;
+  max-width:680px;margin:0 auto 20px;
+}
+.slide-discussion-hint{
+  font-size:13px;color:rgba(255,255,255,.35);
+}
+
+/* Slide navigation */
+.slides-nav{
+  display:flex;align-items:center;justify-content:center;gap:20px;
+  padding:16px 20px 24px;flex-shrink:0;
+}
+.slide-nav-btn{
+  width:48px;height:48px;border-radius:50%;
+  background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;font-family:monospace;
+}
+.slide-nav-btn:hover:not(:disabled){background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
+.slide-nav-btn:disabled{opacity:.25;cursor:default;}
+.slides-counter{
+  font-family:'Press Start 2P',monospace;font-size:8px;color:rgba(255,255,255,.4);
+  min-width:60px;text-align:center;line-height:2;
+}
+.slides-dots{
+  display:flex;gap:6px;align-items:center;
+}
+.slides-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:rgba(255,255,255,.18);transition:all .2s;
+}
+.slides-dot.active{background:#FFDC2E;box-shadow:0 0 6px rgba(255,220,46,.5);}
+.slides-dot.visited{background:rgba(255,255,255,.4);}
+
+/* "Back to slides" button shown when sim is visible */
+#back-to-slides-btn{
+  position:fixed;bottom:60px;right:16px;z-index:999;
+  padding:8px 16px;font-size:12px;font-weight:800;
+  background:#7c3aed;color:#fff;border:none;border-radius:20px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 4px 16px rgba(124,58,237,.5);
+  transition:all .15s;display:none;
+}
+#back-to-slides-btn:hover{background:#6d28d9;transform:translateY(-2px);}
+
+/* Trainer panel slide button */
+.fac-slides-btn{
+  width:100%;padding:14px;font-size:13px;font-weight:800;
+  background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 4px 0 #3730a3,0 0 20px rgba(124,58,237,.3);transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.fac-slides-btn:hover{background:linear-gradient(135deg,#6d28d9,#4338ca);transform:translateY(-2px);}
+.fac-slides-section{padding:14px 18px;border-bottom:2px solid rgba(124,58,237,.3);}
+.fac-slides-hint{font-size:11px;color:rgba(255,255,255,.4);text-align:center;margin-top:7px;}
+
+/* Pause button in facilitator panel */
+.fac-pause-btn{
+  width:100%;padding:12px;font-size:13px;font-weight:800;
+  background:#FFDC2E;color:#1a1a2e;border:none;border-radius:10px;
+  cursor:pointer;font-family:'Nunito',sans-serif;
+  box-shadow:0 4px 0 #b8960a;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.fac-pause-btn:hover{background:#ffe55a;transform:translateY(-2px);}
+.fac-pause-section{padding:14px 18px;border-bottom:2px solid rgba(255,220,46,.2);}
+.fac-pause-hint{font-size:11px;color:rgba(255,255,255,.4);text-align:center;margin-top:7px;}
+
+@media print{
+  body>*:not(#browser){display:none!important;}
+  #hud,#browser .browser-bar,.ace-topnav,.ace-tabbar,.ace-bottombar,.progress-track{display:none!important;}
+  .coach-overlay,.scenario-menu{display:none!important;}
+  .score-actions{display:none!important;}
+}
+
+/* ── TEMPLATE PICKER ─────────────────────────── */
+.template-picker{
+  position:absolute;bottom:100%;left:0;
+  background:#fff;border:2px solid #e5e7eb;border-radius:10px;
+  padding:6px;min-width:260px;z-index:50;
+  box-shadow:0 -8px 24px rgba(0,0,0,.12);
+  animation:fadeUp .2s ease;
+}
+.template-option{
+  padding:8px 12px;border-radius:6px;cursor:pointer;
+  font-size:12px;font-weight:700;color:#374151;transition:background .15s;
+}
+.template-option:hover{background:#eff6ff;color:#0070EB;}
+.template-option .tmpl-sub{font-size:10px;color:#9ca3af;font-weight:400;margin-top:2px;}
+
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-title">ACE SIMULATOR<span>ALEX'S FIRST SHIFT</span></div>
+  <button class="fac-toggle" id="fac-toggle-btn" onclick="toggleFacilitatorMode()">🎓 TRAINER MODE</button>
+  <div class="hud-stats">
+    <div class="hud-stat"><div class="lbl">XP</div><div class="val" id="xp">0</div></div>
+    <div class="hud-stat"><div class="lbl">LIVES</div>
+      <div class="hearts">
+        <span class="heart" id="h0">❤️</span>
+        <span class="heart" id="h1">❤️</span>
+        <span class="heart" id="h2">❤️</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fake browser -->
+<div id="browser">
+  <div class="browser-bar">
+    <div class="bdot r"></div><div class="bdot y"></div><div class="bdot g"></div>
+    <div class="burl" id="burl">ace.example.com/service-console</div>
+  </div>
+
+  <!-- ACE App -->
+  <div id="ace">
+
+    <!-- Top Nav -->
+    <div class="ace-topnav">
+      <div class="ace-shield">🛡️</div>
+      <div class="ace-search-wrap">
+        <div class="ace-search">Search...</div>
+      </div>
+      <div class="ace-nav-icons">
+        <div class="nav-icon">⭐</div>
+        <div class="nav-icon">➕</div>
+        <div class="nav-icon">🔔</div>
+        <div class="nav-icon">❓</div>
+        <div class="nav-avatar" title="Alex">A</div>
+      </div>
+    </div>
+
+    <!-- App tab bar -->
+    <div class="ace-tabbar">
+      <div class="app-launcher-wrap">
+        <div class="app-launcher-btn" id="app-launcher-btn" onclick="toggleAppLauncher()">⣿</div>
+        <div class="app-launcher-dropdown" id="app-launcher-dd">
+          <div class="al-header">App Launcher</div>
+          <div class="al-item al-featured" id="al-console" onclick="openServiceConsole()">
+            <div class="al-icon" style="background:linear-gradient(135deg,#0070EB,#0050b3);">🛡️</div>
+            <div class="al-info"><div class="al-name">Support Service Console</div><div class="al-desc">Your main ACE workspace</div></div>
+          </div>
+          <div class="al-divider"></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);">💼</div><div class="al-info"><div class="al-name">Cases</div></div></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#ec4899,#db2777);">⚡</div><div class="al-info"><div class="al-name">CloudX – Activity Stream</div></div></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);">👤</div><div class="al-info"><div class="al-name">Contacts</div></div></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#6366f1,#4f46e5);">🏢</div><div class="al-info"><div class="al-name">Accounts</div></div></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#10b981,#059669);">📊</div><div class="al-info"><div class="al-name">Reports</div></div></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#f97316,#ea580c);">🎯</div><div class="al-info"><div class="al-name">Dashboards</div></div></div>
+          <div class="al-item" onclick="toggleAppLauncher()"><div class="al-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">💬</div><div class="al-info"><div class="al-name">Chatter</div></div></div>
+        </div>
+      </div>
+      <div class="ace-appname"><div class="app-dot"></div> Support Service Co…</div>
+      <div class="ace-tab active" id="tab-cases">📋 Cases <span class="tab-count blue" id="case-count">0</span></div>
+      <div class="ace-tab" id="tab-home">🏠 Home</div>
+    </div>
+
+    <!-- Main content area -->
+    <div id="main-content" style="display:flex;flex-direction:column;flex:1;position:relative;">
+      <!-- Scenario intro overlay -->
+      <div class="scenario-intro" id="scenario-intro">
+        <div class="scenario-card">
+          <span class="scenario-emoji" id="s-emoji">☀️</span>
+          <div class="scenario-act" id="s-act">LOADING...</div>
+          <div class="scenario-title" id="s-title">Loading...</div>
+          <div class="scenario-desc" id="s-desc">...</div>
+          <div id="s-discussion" style="display:none;"></div>
+          <button class="scenario-start" id="s-btn" onclick="startScenario()">▶ START</button>
+        </div>
+      </div>
+
+      <!-- Views -->
+      <!-- Scenario select menu -->
+      <div class="scenario-menu" id="scenario-menu" style="display:none;"><!-- filled by JS --></div>
+
+      <div id="view-cases" style="display:none;flex-direction:column;flex:1;">
+        <!-- Case list header -->
+        <div class="case-list-header">
+          <div class="case-list-icon">💼</div>
+          <div>
+            <div class="case-list-label">Cases</div>
+            <div class="case-list-title">1 - My New, Open, On Hold Cases</div>
+            <div class="case-list-subtitle" id="case-list-sub">0 items · Sorted by Case Number · Filtered by Status</div>
+          </div>
+          <div class="case-header-btns">
+            <div class="case-header-btn">Change Owner</div>
+            <div class="case-header-btn">Merge Cases</div>
+            <div class="case-header-btn primary">+ New</div>
+          </div>
+        </div>
+        <div class="case-search-row">
+          <div class="case-search-wrap"><div class="case-search">Search this list...</div></div>
+          <div class="icon-btn">⚙️</div><div class="icon-btn">≡</div>
+          <div class="icon-btn">🔄</div><div class="icon-btn">↕️</div>
+          <div class="icon-btn filter-btn">🔽</div>
+        </div>
+        <div class="case-list-body" id="case-list-body">
+          <div class="case-list-meta" id="case-list-meta">0 items</div>
+          <div id="case-rows"></div>
+        </div>
+      </div>
+
+      <div id="view-email" style="display:none;flex-direction:column;flex:1;"><!-- filled by JS --></div>
+      <div id="view-chat"  style="display:none;flex-direction:column;flex:1;"><!-- filled by JS --></div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="ace-bottombar">
+      <div class="bottombar-item active" id="omni-trigger" onclick="toggleOmni()">
+        <div class="omni-status" id="omni-status-pill">
+          <div class="omni-dot offline" id="omni-dot"></div>
+          <span id="omni-label">Offline</span>
+          <span>▾</span>
+        </div>
+        <div class="omni-dropdown" id="omni-dropdown">
+          <div style="font-size:10px;font-weight:800;color:#9ca3af;padding:4px 10px 2px;text-transform:uppercase;letter-spacing:.5px;">Available</div>
+          <div class="omni-option" onclick="setOmni('Available - All Channels','green')">
+            <div class="omni-dot green"></div>Available - All Channels
+          </div>
+          <div class="omni-option" onclick="setOmni('Available - Chat','green')">
+            <div class="omni-dot green"></div>Available - Chat
+          </div>
+          <div class="omni-option" onclick="setOmni('Available - Email, Web, Phone','green')">
+            <div class="omni-dot green"></div>Available - Email, Web, Phone
+          </div>
+          <div style="font-size:10px;font-weight:800;color:#9ca3af;padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.5px;">Away / Busy</div>
+          <div class="omni-option" onclick="setOmni('1:1','orange')">
+            <div class="omni-dot orange"></div>1:1
+          </div>
+          <div class="omni-option" onclick="setOmni('Available - Social','orange')">
+            <div class="omni-dot orange"></div>Available - Social
+          </div>
+          <div class="omni-option" onclick="setOmni('Break','orange')">
+            <div class="omni-dot orange"></div>Break
+          </div>
+          <div class="omni-option selected" onclick="setOmni('End of Shift','orange')">
+            <div class="omni-dot orange"></div>End of Shift
+          </div>
+          <div class="omni-option" onclick="setOmni('Follow up work','orange')">
+            <div class="omni-dot orange"></div>Follow up work
+          </div>
+          <div class="omni-option" onclick="setOmni('Lunch','orange')">
+            <div class="omni-dot orange"></div>Lunch
+          </div>
+          <div class="omni-option" onclick="setOmni('Meeting','orange')">
+            <div class="omni-dot orange"></div>Meeting
+          </div>
+          <div class="omni-option" onclick="setOmni('Personal','orange')">
+            <div class="omni-dot orange"></div>Personal
+          </div>
+          <div class="omni-option" onclick="setOmni('Training','orange')">
+            <div class="omni-dot orange"></div>Training
+          </div>
+        </div>
+      </div>
+      <div class="bottombar-item">≫ Macros</div>
+      <div class="bottombar-item" id="alley-oop-btn" onclick="openAlleyOopPanel()">🤝 Alley-Oop</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Progress -->
+<div class="progress-track">
+  <div class="prog-lbl">SHIFT</div>
+  <div class="prog-bar"><div class="prog-fill" id="pf" style="width:0%"></div></div>
+  <div class="prog-lbl" id="pl">Step 0 of 7</div>
+</div>
+
+<!-- Coach tip overlay (hidden) -->
+<div class="coach-overlay" id="coach" style="display:none;" onclick="closeCoach()">
+  <div class="coach-box" id="coach-box" onclick="event.stopPropagation()">
+    <div class="xp-badge" id="xp-badge" style="display:none">+100 XP</div>
+    <div class="coach-avatar" id="coach-avatar">🧑‍💼</div>
+    <div class="coach-body">
+      <div class="coach-title" id="coach-title">...</div>
+      <div class="coach-text"  id="coach-text">...</div>
+      <button class="coach-btn" id="coach-btn" onclick="closeCoach()">Got it!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Facilitator slide-out panel -->
+<div id="fac-panel"><!-- filled by JS --></div>
+
+<script>
+// ── STATE ─────────────────────────────────────────
+var G = {
+  xp: 0,
+  lives: 3,
+  step: 0,
+  omniStatus: 'offline',
+  scenario: 0,
+  noteWritten: false,
+  replyDrafted: false,
+  templateUsed: false,
+  chatReplied: false,
+  statusSet: false,
+  facilitatorMode: false,
+  presentationMode: false,
+  aoReplied: false,
+  aoTimer: null,
+  pausePoint: 0
+};
+
+var SCENARIOS = [
+  {
+    emoji:'☀️', act:'STEP 1 OF 7', title:"Open the Console & Set Your Status",
+    desc:"Alex just logged into ACE for the first time. Start by launching the Support Service Console from the App Launcher — then set your Omni-Channel status to receive email cases.",
+    start: setupStep1
+  },
+  {
+    emoji:'📧', act:'STEP 2 OF 7', title:"Handle Your First Email Case",
+    desc:"A customer is upset — their bonus bet didn't apply after a winning wager. An email case has been assigned to Alex. Click the case to open it, use a template to draft a reply, and close it correctly.",
+    start: setupStep2
+  },
+  {
+    emoji:'💬', act:'STEP 3 OF 7', title:"Jump Into Live Chat",
+    desc:"A chat case just came in. The customer wants help unlinking their MFA. Work through the chat, then close it out properly.",
+    start: setupStep3
+  },
+  {
+    emoji:'🔺', act:'STEP 4 OF 7', title:"Escalate a Fraud Case",
+    desc:"Alex opens a case and sees 'Account Takeover' in the contact details. This one needs to go to the right team — fast. Find the correct escalation path.",
+    start: setupStep4
+  },
+  {
+    emoji:'🎯', act:'STEP 5 OF 7', title:"Apply a Bonus Bet",
+    desc:"Riley's bonus bet didn't show up after a qualifying win. Use the Bonus Bet component to select the right product, enter the Bet ID, and confirm the application before closing the case.",
+    start: setupStep6
+  },
+  {
+    emoji:'🤝', act:'STEP 6 OF 7', title:"Use Alley-Oop",
+    desc:"Alex gets a tricky case about a disputed voided parlay — not sure how to handle it. Try the Alley-Oop widget to get specialist support, and learn what to do when no one is available.",
+    start: setupStep7
+  },
+  {
+    emoji:'🌙', act:'STEP 7 OF 7', title:"Close Out Your Shift",
+    desc:"It's 5pm. Alex's first shift is done! Don't forget the most important last step before logging off.",
+    start: setupStep5
+  }
+];
+
+// ── PULSE HELPERS ─────────────────────────────────
+function pulse(id) {
+  var el = document.getElementById(id);
+  if(el) el.classList.add('needs-click');
+}
+function unpulse(id) {
+  var el = document.getElementById(id);
+  if(el) el.classList.remove('needs-click');
+}
+function unpulseAll() {
+  document.querySelectorAll('.needs-click').forEach(function(el){ el.classList.remove('needs-click'); });
+}
+
+// ── HUD ───────────────────────────────────────────
+function addXP(n) {
+  G.xp += n;
+  document.getElementById('xp').textContent = G.xp;
+}
+function loseLife() {
+  G.lives = Math.max(0, G.lives - 1);
+  for(var i=0;i<3;i++) document.getElementById('h'+i).classList.toggle('gone', i >= G.lives);
+}
+function setProgress(n, total) {
+  total = total || 7;
+  document.getElementById('pf').style.width = ((n/total)*100)+'%';
+  document.getElementById('pl').textContent = 'Step '+n+' of '+total;
+}
+
+// ── VIEWS ─────────────────────────────────────────
+function showView(name) {
+  ['cases','email','chat'].forEach(function(v){
+    document.getElementById('view-'+v).style.display = v===name ? 'flex' : 'none';
+  });
+}
+
+// ── OMNI CHANNEL ──────────────────────────────────
+function toggleOmni() {
+  var dd = document.getElementById('omni-dropdown');
+  dd.classList.toggle('open');
+}
+document.addEventListener('click', function(e){
+  if(!document.getElementById('omni-trigger').contains(e.target)) {
+    document.getElementById('omni-dropdown').classList.remove('open');
+  }
+});
+
+function setOmni(label, cls) {
+  document.getElementById('omni-dropdown').classList.remove('open');
+  document.getElementById('omni-label').textContent = label;
+  document.getElementById('omni-dot').className = 'omni-dot ' + cls;
+  G.omniStatus = cls;
+
+  if(G.scenario === 0) {
+    // Step 1: agent must set Available - Email, Web, Phone (email-only shift)
+    if(label === 'Available - Email, Web, Phone') {
+      unpulse('omni-trigger');
+      G.step = 1;
+      addXP(100);
+      setProgress(1);
+      showCoach('success','🎉','Status Set — Ready for Emails!',
+        '<b>Available - Email, Web, Phone</b> is correct for today\'s task — it routes email, web form and phone cases to Alex.<br><br>'
+        +'📌 <b>Available - All Channels</b> adds chat on top of that — only use it when your supervisor asks you to handle all case types.<br><br>'
+        +'📌 Your status controls exactly what routes to you — always double-check before you start.',
+        100, maybeDebrief(0, function(){ loadScenario(1); }));
+    } else if(label === 'Available - All Channels') {
+      loseLife();
+      showCoach('error','🤔','Too Broad for Today!',
+        '<b>Available - All Channels</b> would also route <b>live chat</b> cases to Alex — but today\'s task is email only.<br><br>'
+        +'Select <b>Available - Email, Web, Phone</b> to receive only email and web cases. Try again!',
+        0, null);
+    } else if(label === 'Available - Chat') {
+      loseLife();
+      showCoach('error','📧','Wrong Channel!',
+        '<b>Available - Chat</b> would route chat cases — but Alex\'s first task is an <b>email case</b>.<br><br>'
+        +'Select <b>Available - Email, Web, Phone</b> to receive email cases. Try again!',
+        0, null);
+    } else if(cls === 'orange') {
+      loseLife();
+      showCoach('error','😬','Cases Won\'t Route!',
+        '<b>'+label+'</b> is a non-routing status — ACE won\'t assign any new cases to Alex.<br><br>'
+        +'Select <b>Available - Email, Web, Phone</b> to start receiving email cases.',
+        0, null);
+    }
+  } else if(G.scenario === 6) {
+    // Step 7: end of shift — correct answer is "End of Shift"
+    if(label === 'End of Shift') {
+      unpulse('omni-trigger');
+      addXP(100);
+      setProgress(7);
+      showCoach('success','🌙','Shift Complete!',
+        'Alex set status to <b>End of Shift</b> — the correct status when your shift ends. <br><br>'
+        +'⚠️ Never leave yourself on <b>Available - All Channels</b> after your shift — cases will keep routing to you all evening. Your queue becomes a ghost queue.<br><br>'
+        +'🏆 <b>First shift survived!</b>',
+        100, maybeDebrief(6, function(){ showFinalScore(); }));
+    } else if(cls === 'green') {
+      loseLife();
+      showCoach('error','😬','Still Routing Cases!',
+        'Any <b>Available</b> status means cases will keep coming in. At the end of your shift, select <b>End of Shift</b> to stop routing and let the system know you\'re done.',
+        0, null);
+    } else {
+      loseLife();
+      showCoach('error','😬','Not Quite!',
+        '<b>'+label+'</b> is not the correct end-of-shift status. Use <b>End of Shift</b> — it flags to supervisors that you\'ve clocked off and stops case routing.',
+        0, null);
+    }
+  }
+}
+
+// ── COACH TIP ─────────────────────────────────────
+var coachNext = null;
+function showCoach(type, emoji, title, text, xp, nextFn) {
+  coachNext = nextFn;
+  var box = document.getElementById('coach-box');
+  box.className = 'coach-box ' + type;
+  document.getElementById('coach-avatar').textContent = emoji;
+  document.getElementById('coach-title').textContent = title;
+  document.getElementById('coach-text').innerHTML = text;
+  var badge = document.getElementById('xp-badge');
+  if(xp > 0) { badge.textContent = '+'+xp+' XP'; badge.style.display='block'; }
+  else { badge.style.display='none'; }
+  document.getElementById('coach-btn').textContent = nextFn ? 'Continue ▶' : 'Got it!';
+  document.getElementById('coach').style.display = 'flex';
+}
+function closeCoach() {
+  document.getElementById('coach').style.display = 'none';
+  if(coachNext) { var fn = coachNext; coachNext = null; fn(); }
+}
+
+// ── SCENARIO LOADER ───────────────────────────────
+function loadScenario(idx) {
+  G.scenario = idx;
+  var s = SCENARIOS[idx];
+  document.getElementById('s-emoji').textContent = s.emoji;
+  document.getElementById('s-act').textContent = s.act;
+  document.getElementById('s-title').textContent = s.title;
+  document.getElementById('s-desc').textContent = s.desc;
+  // Discussion prompt (facilitator mode only)
+  var dp = document.getElementById('s-discussion');
+  if(dp) {
+    var fd = FACILITATOR_DATA[idx];
+    if(G.facilitatorMode && fd && fd.discussionQ) {
+      dp.innerHTML = '<div class="discussion-prompt"><div class="discussion-prompt-label">💬 Ask the Class First</div><div class="discussion-prompt-q">'+fd.discussionQ+'</div></div>';
+      dp.style.display = 'block';
+    } else {
+      dp.style.display = 'none';
+    }
+  }
+  document.getElementById('scenario-intro').style.display = 'flex';
+  updateFacilitatorPanel(idx);
+}
+function startScenario() {
+  document.getElementById('scenario-intro').style.display = 'none';
+  SCENARIOS[G.scenario].start();
+}
+
+// ── STEP 1: Set Omni Status ───────────────────────
+function setupStep1() {
+  ['cases','email','chat'].forEach(function(v){
+    document.getElementById('view-'+v).style.display = 'none';
+  });
+  document.getElementById('case-count').textContent = '0';
+  var mc = document.getElementById('main-content');
+  var ph = document.getElementById('console-placeholder');
+  if(ph) ph.remove();
+  var placeholder = document.createElement('div');
+  placeholder.id = 'console-placeholder';
+  placeholder.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#9ca3af;background:#f9fafb;';
+  placeholder.innerHTML =
+    '<div style="font-size:48px;">⣿</div>'
+    +'<div style="font-family:\'Press Start 2P\',monospace;font-size:10px;color:#9ca3af;">STEP 1 OF 3</div>'
+    +'<div style="font-size:14px;font-weight:800;color:#374151;">Open the App Launcher</div>'
+    +'<div style="font-size:12px;color:#6b7280;text-align:center;max-width:260px;">Click the <b>grid icon (⣿)</b> in the top-left of the tab bar to launch the Support Service Console</div>';
+  mc.appendChild(placeholder);
+  // Pulse the App Launcher button to guide trainees
+  setTimeout(function(){ pulse('app-launcher-btn'); }, 300);
+}
+
+function toggleAppLauncher() {
+  var dd = document.getElementById('app-launcher-dd');
+  var btn = document.getElementById('app-launcher-btn');
+  var isOpen = dd.classList.contains('open');
+  dd.classList.toggle('open', !isOpen);
+  btn.classList.toggle('active', !isOpen);
+  // In Step 1: stop pulsing the launcher button and start pulsing the console item
+  if(G.scenario === 0 && !isOpen) {
+    unpulse('app-launcher-btn');
+    setTimeout(function(){ pulse('al-console'); }, 100);
+  }
+}
+
+document.addEventListener('click', function(e){
+  var wrap = document.getElementById('app-launcher-btn');
+  var dd = document.getElementById('app-launcher-dd');
+  if(wrap && dd && !wrap.contains(e.target) && !dd.contains(e.target)) {
+    dd.classList.remove('open');
+    document.getElementById('app-launcher-btn').classList.remove('active');
+  }
+});
+
+function openServiceConsole() {
+  if(G.scenario !== 0) { toggleAppLauncher(); return; }
+  var ph = document.getElementById('console-placeholder');
+  if(ph) ph.remove();
+  toggleAppLauncher();
+  addXP(50);
+  showPinCasesStep();
+}
+
+function showPinCasesStep() {
+  // Show cases view with a "pin your view" sub-step overlay
+  showView('cases');
+  document.getElementById('case-rows').innerHTML = '';
+  document.getElementById('case-list-meta').textContent = '0 items';
+
+  // Build pin-step overlay inside main-content
+  var mc = document.getElementById('main-content');
+  var existing = document.getElementById('pin-cases-overlay');
+  if(existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'pin-cases-overlay';
+  overlay.style.cssText = 'position:absolute;inset:0;background:rgba(10,14,26,.88);display:flex;align-items:center;justify-content:center;z-index:150;padding:20px;animation:fadeIn .25s ease;';
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:14px;padding:24px 28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);border:3px solid #0070EB;">'
+    +'<div style="font-family:\'Press Start 2P\',monospace;font-size:8px;color:#0070EB;margin-bottom:8px;">STEP 2 OF 3 — PIN YOUR CASES VIEW</div>'
+    +'<div style="font-size:16px;font-weight:900;color:#111827;margin-bottom:8px;">Pin "My New, Open, On Hold Cases"</div>'
+    +'<div style="font-size:12px;color:#6b7280;line-height:1.7;margin-bottom:16px;">Before you can work cases, you need to pin the right case view. This is what you\'ll see every day when you log in — all your active cases in one list.</div>'
+    // Fake view list with pin options
+    +'<div style="border:2px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:16px;">'
+    +'<div style="background:#f9fafb;padding:8px 12px;font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;">Available Views</div>'
+    +'<div id="pin-row-target" onclick="completePinStep()" style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#eff6ff;border-bottom:1px solid #e5e7eb;cursor:pointer;transition:background .15s;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#eff6ff\'">'
+    +'<div style="font-size:16px;">📋</div>'
+    +'<div style="flex:1;"><div style="font-size:12px;font-weight:800;color:#111827;">My New, Open, On Hold Cases</div><div style="font-size:10px;color:#6b7280;">Cases assigned to you · Active workload</div></div>'
+    +'<div id="pin-icon-target" style="width:28px;height:28px;border-radius:6px;background:#dbeafe;border:2px solid #0070EB;display:flex;align-items:center;justify-content:center;font-size:14px;" title="Click to pin">📌</div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #e5e7eb;opacity:.45;cursor:default;">'
+    +'<div style="font-size:16px;">📋</div>'
+    +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#374151;">All Open Cases</div><div style="font-size:10px;color:#9ca3af;">Team view</div></div>'
+    +'<div style="width:28px;height:28px;border-radius:6px;background:#f3f4f6;border:2px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:12px;color:#9ca3af;">📌</div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;opacity:.45;cursor:default;">'
+    +'<div style="font-size:16px;">📋</div>'
+    +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#374151;">Recently Solved Cases</div><div style="font-size:10px;color:#9ca3af;">Last 7 days</div></div>'
+    +'<div style="width:28px;height:28px;border-radius:6px;background:#f3f4f6;border:2px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:12px;color:#9ca3af;">📌</div>'
+    +'</div>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#9ca3af;text-align:center;">👆 Click the 📌 pin icon on <b>My New, Open, On Hold Cases</b> to pin it to your tab bar</div>'
+    +'</div>';
+  mc.appendChild(overlay);
+
+  // Pulse the pin icon row
+  setTimeout(function(){ pulse('pin-row-target'); }, 200);
+}
+
+function completePinStep() {
+  unpulse('pin-row-target');
+  var overlay = document.getElementById('pin-cases-overlay');
+  if(overlay) overlay.remove();
+
+  // Update the case list title to show it's pinned
+  var title = document.querySelector('.case-list-title');
+  if(title) title.textContent = '1 - My New, Open, On Hold Cases';
+
+  document.getElementById('case-list-meta').textContent = '0 items · View pinned! Now set your Omni-Channel status to begin.';
+
+  showCoach('success','📌','View Pinned!',
+    '<b>My New, Open, On Hold Cases</b> is now pinned to your tab bar — this is your daily workspace in ACE.<br><br>'
+    +'📌 You\'ll see <b>2 email cases at a time</b> and <b>2 chat cases at a time</b> routed here automatically.<br><br>'
+    +'Now set your <b>Omni-Channel status</b> in the bottom bar so cases can start routing to you.',
+    50, function() {
+      // Pulse the omni widget after coach dismisses
+      setTimeout(function(){ pulse('omni-trigger'); }, 200);
+    });
+}
+
+// ── STEP 2: Email Case ────────────────────────────
+function setupStep2() {
+  G.noteWritten = false;
+  G.replyDrafted = false;
+  G.templateUsed = false;
+  showView('cases');
+  document.getElementById('case-count').textContent = '1';
+  document.getElementById('case-list-meta').textContent = '1 item · New case assigned — click it to open';
+  document.getElementById('case-rows').innerHTML =
+    '<div class="case-row new-pulse" id="email-case-row" onclick="openEmailCase()">'
+    +'<div class="case-channel email">📧</div>'
+    +'<div class="case-info">'
+    +'<div class="case-customer">Jordan M.</div>'
+    +'<div class="case-subject">Bonus bet not applied — winning wager last night</div>'
+    +'<div class="case-meta">Case #00142 · Assigned to you · Just now</div>'
+    +'</div>'
+    +'<div class="case-badge badge-new">NEW</div>'
+    +'<div class="case-time">0m ago</div>'
+    +'</div>';
+  setTimeout(function(){ pulse('email-case-row'); }, 300);
+}
+
+function openEmailCase() {
+  unpulseAll();
+  showView('email');
+  var el = document.getElementById('view-email');
+  el.innerHTML =
+    '<div class="detail-header">'
+    +'<button class="back-btn" onclick="setupStep2()">← Back</button>'
+    +'<span class="detail-case-id">Case #00142</span>'
+    +'<span class="detail-status-badge badge-new">NEW</span>'
+    +'<button class="refresh-btn" id="refresh-btn" onclick="refreshCustomerData()" style="margin-left:auto;">🔄 Refresh Admin Web Attributes</button>'
+    +'</div>'
+    +'<div class="detail-body">'
+
+    // Feed col
+    +'<div class="feed-col">'
+    +'<div class="feed-tabs">'
+    +'<div class="feed-tab active">Case Feed</div>'
+    +'<div class="feed-tab">Details</div>'
+    +'<div class="feed-tab">Activity</div>'
+    +'</div>'
+    +'<div class="feed-messages" id="feed-msgs">'
+    +'<div class="msg-in">'
+    +'<div class="msg-sender">Jordan M. — Customer</div>'
+    +'<div class="msg-text">Hi, I placed a bet last night on the Lakers game and it won, but my bonus bet credit hasn\'t shown up in my account. Can someone look into this? My account is JordanM_88. Really frustrating as this was supposed to apply automatically. Thanks</div>'
+    +'</div>'
+    +'</div>'
+
+    // Compose
+    +'<div class="compose-area">'
+    +'<div class="compose-toolbar">'
+    +'<div class="toolbar-btn">B</div>'
+    +'<div class="toolbar-btn"><i>I</i></div>'
+    +'<div class="toolbar-btn"><u>U</u></div>'
+    +'<div class="toolbar-sep"></div>'
+    +'<div class="toolbar-btn">🔗</div>'
+    +'<div class="toolbar-btn">📎</div>'
+    +'<div class="toolbar-sep"></div>'
+    +'<div style="position:relative;">'
+    +'<button class="template-btn" id="tmpl-btn" onclick="toggleTemplates()">📄 Insert Template ▾</button>'
+    +'<div class="template-picker" id="template-picker" style="display:none;">'
+    +'<div class="template-option" onclick="useTemplate(\'bonus\')">🎯 Bonus Bet — Applied & Resolved<div class="tmpl-sub">Confirms bonus bet applied, apologises for delay</div></div>'
+    +'<div class="template-option" onclick="useTemplate(\'general\')">👋 !Greeting/Signoff<div class="tmpl-sub">Base greeting with correct signature</div></div>'
+    +'<div class="template-option" onclick="useTemplate(\'investigate\')">🔍 Investigating Your Account<div class="tmpl-sub">Lets customer know you\'re looking into it</div></div>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'<textarea class="compose-field" id="reply-field" placeholder="Write an email reply to Jordan..."></textarea>'
+    +'<div class="compose-footer">'
+    +'<button class="send-btn" id="send-btn-email" onclick="sendEmailReply()">Send ✉️</button>'
+    +'<button class="attach-btn">📎 Attach</button>'
+    +'<div class="sig-line" id="sig-preview">Signature: —</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+
+    // Right panel
+    +'<div class="detail-col">'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Case Details</div>'
+    +'<div class="detail-field"><div class="detail-field-label">Customer</div><div class="detail-field-value">Jordan M.</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Customer ID</div><div class="detail-field-value">JordanM_88</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Product</div>'
+    +'<select class="status-select" id="product-sel"><option>Sportsbook</option><option>DFS</option><option>Casino</option></select>'
+    +'</div>'
+    +'<div class="detail-field"><div class="detail-field-label">Issue Category</div>'
+    +'<select class="status-select" id="issue-sel"><option>-- Select --</option><option>Bonus & Promotions</option><option>Betting & Wagering</option><option>Account</option></select>'
+    +'</div>'
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Case Status</div>'
+    +'<select class="status-select" id="case-status-sel" onchange="onStatusChange()">'
+    +'<option value="">-- Select Status --</option>'
+    +'<option value="pending">Pending</option>'
+    +'<option value="on-hold">On Hold</option>'
+    +'<option value="escalated">Escalated</option>'
+    +'<option value="solved">Solved</option>'
+    +'</select>'
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Internal Notes</div>'
+    +'<textarea class="internal-note-area" id="internal-note" placeholder="Leave a note before solving..."></textarea>'
+    +'<button class="note-submit" onclick="submitNote()">Post Note</button>'
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<button class="solve-btn" id="solve-btn" onclick="solveCase()" disabled>Complete Case</button>'
+    +'<div style="font-size:10px;color:#9ca3af;margin-top:6px;" id="solve-hint">Send a reply first</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+
+  setTimeout(function(){
+    document.getElementById('reply-field').focus();
+    pulse('tmpl-btn');
+  }, 300);
+}
+
+function toggleTemplates() {
+  var p = document.getElementById('template-picker');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function useTemplate(type) {
+  document.getElementById('template-picker').style.display = 'none';
+  var field = document.getElementById('reply-field');
+  var templates = {
+    bonus: "Hi Jordan,\n\nThank you for reaching out to us! I'm happy to help with your bonus bet query.\n\nI've looked into your account and can confirm the bonus bet credit has now been applied. You should see it reflected in your account immediately.\n\nI'm sorry for the inconvenience this caused — please don't hesitate to reach out if you have any further questions.\n\nYour Support Team",
+    general: "Hi Jordan,\n\nThank you for contacting Client support!\n\n[Your response here]\n\nYour Support Team",
+    investigate: "Hi Jordan,\n\nThank you for getting in touch! I'm looking into your account now and will have an update for you shortly.\n\nYour Support Team"
+  };
+  field.value = templates[type];
+  G.templateUsed = true;
+  unpulse('tmpl-btn');
+  document.getElementById('sig-preview').textContent = 'Signature: ✅ Your Support Team';
+  document.getElementById('sig-preview').style.color = '#1BB152';
+  checkSolveReady();
+  showCoach('info','📄','Template Applied!',
+    'Templates auto-fill the customer\'s name, case number, and the correct signature. <br><br>📌 Notice how every template ends with <b>"Your Support Team"</b> — never change this to your own name.',
+    0, function(){ pulse('send-btn-email'); });
+}
+
+function sendEmailReply() {
+  var field = document.getElementById('reply-field');
+  if(!field.value.trim()) {
+    field.classList.add('highlight-error');
+    setTimeout(function(){ field.classList.remove('highlight-error'); }, 600);
+    showCoach('error','✍️','Reply is Empty!','You need to write a reply before sending. Use the <b>Insert Template</b> button to get started quickly — it fills in the right format and signature automatically.',0,null);
+    return;
+  }
+  var text = field.value;
+  if(text.indexOf('Your Support Team') === -1) {
+    loseLife();
+    // Supervisor DM appears in feed
+    var msgs = document.getElementById('feed-msgs');
+    if(msgs) {
+      msgs.innerHTML += '<div class="msg-supervisor"><div class="msg-sender">👔 Sam (Team Lead) — Internal DM</div><div class="msg-text">Hey Alex — just noticed your reply is missing the correct sign-off. Every customer email must end with <b>"Your Support Team"</b>, not your personal name. Use a template as your base to get it right automatically. 👍</div></div>';
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+    showCoach('error','✍️','Wrong Signature!','Your reply doesn\'t end with <b>"Your Support Team"</b> — the only accepted sign-off. Your Team Lead has flagged it in the feed. Always use a template as your base to avoid this.<br><br>Edit your reply and try again.',0,null);
+    return;
+  }
+  // Add sent message to feed
+  var msgs = document.getElementById('feed-msgs');
+  msgs.innerHTML += '<div class="msg-in" style="align-self:flex-end;background:#eff6ff;border-color:#bfdbfe;">'
+    +'<div class="msg-sender" style="color:#1BB152;">You (Alex) — Sent</div>'
+    +'<div class="msg-text">'+field.value.replace(/\n/g,'<br>')+'</div>'
+    +'</div>';
+  msgs.scrollTop = msgs.scrollHeight;
+  field.value = '';
+  unpulse('send-btn-email');
+  G.replyDrafted = true;
+  addXP(50);
+  checkSolveReady();
+  showCoach('success','✉️','Reply Sent!','Great — Jordan has been replied to. Now post an <b>internal note</b> explaining what you did, then set the case status to <b>Solved</b> to close it out.',50,
+    function(){ pulse('internal-note'); });
+}
+
+function submitNote() {
+  var note = document.getElementById('internal-note');
+  if(!note.value.trim()) {
+    note.classList.add('required-pulse');
+    setTimeout(function(){ note.classList.remove('required-pulse'); }, 1000);
+    showCoach('error','📝','Note is Empty!','An internal post is <b>non-negotiable before solving</b>. Even a brief note like "Applied bonus bet, confirmed with customer" is enough. The next person who touches this case will thank you.',0,null);
+    return;
+  }
+  unpulse('internal-note');
+  G.noteWritten = true;
+  note.style.borderColor = '#1BB152';
+  addXP(50);
+  checkSolveReady();
+  showCoach('success','📝','Note Posted!','Internal note saved. This is what the next agent — or your team lead — will read if they open this case. <b>Always leave one before solving.</b>',50,
+    function(){ pulse('case-status-sel'); });
+}
+
+function onStatusChange() {
+  var v = document.getElementById('case-status-sel').value;
+  G.statusSet = !!v;
+  if(v) { unpulse('case-status-sel'); pulse('solve-btn'); }
+  checkSolveReady();
+}
+
+function checkSolveReady() {
+  var ready = G.replyDrafted;
+  document.getElementById('solve-btn').disabled = !ready;
+  document.getElementById('solve-hint').textContent = ready ? 'Ready to complete!' : 'Send a reply first';
+  document.getElementById('solve-hint').style.color = ready ? '#1BB152' : '#9ca3af';
+}
+
+function solveCase() {
+  var statusSel = document.getElementById('case-status-sel').value;
+  if(!statusSel) {
+    showCoach('error','📋','Select a Status!','You need to select the correct <b>Case Status</b> before completing. Think: is Jordan expecting to reply? Or is this case fully resolved?',0,null);
+    return;
+  }
+  if(statusSel !== 'solved') {
+    loseLife();
+    var hints = {
+      pending:"<b>Pending</b> means you're expecting Jordan to reply. But you've fully resolved the issue — Jordan doesn't need to reply. Use <b>Solved</b> instead.",
+      'on-hold':"<b>On Hold</b> is for when you're waiting on a third party (traders, D&P team). This case is resolved — change the status to <b>Solved</b>.",
+      escalated:"<b>Escalated</b> routes the case to another team. This issue is already fixed — it should be <b>Solved</b>."
+    };
+    showCoach('error','📋','Wrong Status!', hints[statusSel] || 'Select the correct status.',0,null);
+    return;
+  }
+  addXP(150);
+  setProgress(2);
+  document.getElementById('case-count').textContent = '0';
+  showCoach('success','✅','Case Solved!',
+    'Case #00142 closed correctly. Here\'s what Alex did right:<br><br>'
+    +'✅ Used a template (correct signature)<br>'
+    +'✅ Sent a reply to the customer<br>'
+    +'✅ Left an internal post<br>'
+    +'✅ Set status to <b>Solved</b>',
+    150, maybeDebrief(1, function(){ loadScenario(2); }));  // scenario index 2 = chat
+}
+
+// ── STEP 3: Chat Case ─────────────────────────────
+function setupStep3() {
+  G.chatReplied = false;
+  showView('cases');
+  document.getElementById('case-count').textContent = '1';
+  document.getElementById('case-list-meta').textContent = '1 item · Live chat incoming — click to answer!';
+  document.getElementById('case-rows').innerHTML =
+    '<div class="case-row new-pulse" id="chat-case-row" onclick="openChatCase()" style="border-color:#d1fae5;">'
+    +'<div class="case-channel chat">💬</div>'
+    +'<div class="case-info">'
+    +'<div class="case-customer">Sam K. <span style="font-size:10px;color:#1BB152;font-weight:800;">● LIVE</span></div>'
+    +'<div class="case-subject">MFA unlink request — locked out of account</div>'
+    +'<div class="case-meta">Case #00143 · Chat · Assigned to you · Now</div>'
+    +'</div>'
+    +'<div class="case-badge" style="background:#d1fae5;color:#065f46;">LIVE CHAT</div>'
+    +'<div class="case-time">Now</div>'
+    +'</div>';
+  setTimeout(function(){ pulse('chat-case-row'); }, 300);
+}
+
+function openChatCase() {
+  unpulseAll();
+  showView('chat');
+  var el = document.getElementById('view-chat');
+  el.innerHTML =
+    '<div class="detail-header">'
+    +'<button class="back-btn" onclick="setupStep3()">← Cases</button>'
+    +'<span class="detail-case-id">Case #00143 — Sam K.</span>'
+    +'<span class="detail-status-badge" style="background:#d1fae5;color:#065f46;">● LIVE CHAT</span>'
+    +'</div>'
+    +'<div class="detail-body">'
+    +'<div class="chat-view">'
+    +'<div class="chat-header">'
+    +'<div class="chat-customer-avatar">S</div>'
+    +'<div><div class="chat-customer-name">Sam K.</div><div class="chat-customer-sub">Active now · Sportsbook account</div></div>'
+    +'<div class="chat-status-dot"></div>'
+    +'</div>'
+    +'<div class="chat-messages" id="chat-msgs">'
+    +'<div class="chat-msg-customer"><div class="chat-bubble-customer">Hi! I\'m locked out of my account — I got a new phone and can\'t get through the MFA verification. Can you help me unlink it?</div><div class="chat-time left">Sam · just now</div></div>'
+    +'</div>'
+    +'<div class="chat-compose">'
+    +'<textarea class="chat-input" id="chat-input" placeholder="Type your reply..." rows="1"></textarea>'
+    +'<button class="chat-send" id="chat-send-btn" onclick="sendChatMessage()">➤</button>'
+    +'</div>'
+    +'</div>'
+    +'<div class="detail-col">'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Chat Actions</div>'
+    +'<div style="font-size:11px;color:#374151;margin-bottom:8px;">Quick actions available in chat:</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px;">'
+    +'<button class="case-header-btn" id="mfa-btn" onclick="doMFAUnlink()" style="text-align:left;font-size:11px;">🔓 MFA Quick Text — Unlink</button>'
+    +'<button class="case-header-btn" onclick="tryAttachment()" style="text-align:left;font-size:11px;">📎 Send Attachment</button>'
+    +'</div>'
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Close Chat</div>'
+    +'<select class="status-select" id="chat-status" style="margin-bottom:8px;">'
+    +'<option value="">-- Issue Type --</option>'
+    +'<option value="mfa">Account — MFA Unlink</option>'
+    +'<option value="other">Account — Other</option>'
+    +'<option value="unresponsive">Unresponsive</option>'
+    +'</select>'
+    +'<button class="solve-btn" id="end-chat-btn" onclick="endChat()" style="background:#6b7280;box-shadow:0 3px 0 #374151;">End Chat</button>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+}
+
+function sendChatMessage() {
+  var input = document.getElementById('chat-input');
+  if(!input.value.trim()) return;
+  var msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML += '<div class="chat-msg-agent"><div class="chat-bubble-agent">'+input.value+'</div><div class="chat-time">Alex · just now</div></div>';
+  msgs.scrollTop = msgs.scrollHeight;
+  input.value = '';
+  G.chatReplied = true;
+  // Sam replies after a moment
+  if(!G.chatReplyDone) {
+    G.chatReplyDone = true;
+    setTimeout(function(){
+      msgs.innerHTML += '<div class="chat-msg-customer"><div class="chat-bubble-customer">Thanks! Can you actually unlink my MFA? I\'ve got a new phone.</div><div class="chat-time left">Sam · just now</div></div>';
+      msgs.scrollTop = msgs.scrollHeight;
+      pulse('mfa-btn');
+    }, 1200);
+  }
+}
+
+function tryAttachment() {
+  loseLife();
+  showCoach('error','📎','Can\'t Send Attachments in Chat!',
+    'Agents <b>cannot send attachments through chat</b>. If a customer needs a file, you\'ll need to follow up via <b>email</b>.<br><br>You CAN receive attachments from customers in chat, but you can\'t send them back.',
+    0, null);
+}
+
+function doMFAUnlink() {
+  unpulse('mfa-btn');
+  var msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML += '<div class="chat-msg-agent"><div class="chat-bubble-agent" style="background:#1BB152;">Hi Sam! I\'ve gone ahead and unlinked the MFA from your account. You should now be able to log in and set up MFA on your new phone. Is there anything else I can help you with today?</div><div class="chat-time">Alex (MFA Quick Text) · just now</div></div>';
+  setTimeout(function(){
+    msgs.innerHTML += '<div class="chat-msg-customer"><div class="chat-bubble-customer">Perfect, thank you so much! That worked 👍</div><div class="chat-time left">Sam · just now</div></div>';
+    msgs.scrollTop = msgs.scrollHeight;
+    document.getElementById('end-chat-btn').style.background = '#1BB152';
+    document.getElementById('end-chat-btn').style.boxShadow = '0 3px 0 #0f7a33';
+    addXP(50);
+    showCoach('success','🔓','MFA Unlinked!','The MFA Quick Text sent the unlink action and auto-filled the right message. <br><br>Sam is happy — now close out the chat: select the <b>Issue Type</b> and click <b>End Chat</b>.',50,
+      function(){ pulse('chat-status'); });
+  }, 1400);
+}
+
+function endChat() {
+  var it = document.getElementById('chat-status').value;
+  if(it && it !== 'unresponsive') { unpulse('chat-status'); pulse('end-chat-btn'); }
+  if(!it) {
+    showCoach('error','📋','Select Issue Type First!','You need to select the <b>Issue Type</b> before ending the chat — this feeds into your metrics and CSAT tracking.',0,null);
+    return;
+  }
+  if(it === 'unresponsive') {
+    loseLife();
+    showCoach('error','❌','Wrong Issue Type!',
+      '<b>Unresponsive</b> can only be set by <b>automation</b> — when a customer sends zero messages after connecting (Scenario A).<br><br>Sam sent messages and the issue was resolved. Use <b>Account — MFA Unlink</b>.',
+      0, null);
+    return;
+  }
+  addXP(150);
+  setProgress(3);
+  showCoach('success','💬','Chat Closed!',
+    'Great work on the chat! Key rules to remember:<br><br>'
+    +'✅ MFA can be unlinked via Quick Text in chat<br>'
+    +'📎 <b>Attachments must go via email</b> — never through chat<br>'
+    +'📋 Always select the correct Issue Type before ending',
+    150, maybeDebrief(2, function(){ loadScenario(3); }));  // scenario index 3 = fraud
+}
+
+// ── STEP 4: Fraud Escalation ──────────────────────
+function setupStep4() {
+  showView('cases');
+  document.getElementById('case-count').textContent = '1';
+  document.getElementById('case-list-meta').textContent = '1 item · Urgent case flagged — click to open';
+  document.getElementById('case-rows').innerHTML =
+    '<div class="case-row urgent" id="fraud-case-row" onclick="openFraudCase()">'
+    +'<div class="case-channel email" style="background:#fee2e2;">🚨</div>'
+    +'<div class="case-info">'
+    +'<div class="case-customer">Taylor R. <span style="font-size:10px;color:#b91c1c;font-weight:800;">⚠ URGENT</span></div>'
+    +'<div class="case-subject">Cannot access account — says it was taken over</div>'
+    +'<div class="case-meta">Case #00144 · Account Status: SUSPENDED · Fraud Suspension — Account Takeover</div>'
+    +'</div>'
+    +'<div class="case-badge badge-urgent">URGENT</div>'
+    +'<div class="case-time">2m ago</div>'
+    +'</div>';
+  setTimeout(function(){ pulse('fraud-case-row'); }, 300);
+}
+
+function openFraudCase() {
+  unpulseAll();
+  showView('email');
+  var el = document.getElementById('view-email');
+  el.innerHTML =
+    '<div class="detail-header">'
+    +'<button class="back-btn" onclick="setupStep4()">← Cases</button>'
+
+    +'<span class="detail-case-id">Case #00144 — Taylor R.</span>'
+    +'<span class="detail-status-badge badge-urgent">URGENT</span>'
+    +'</div>'
+    +'<div class="detail-body">'
+    +'<div class="feed-col">'
+    +'<div class="feed-tabs"><div class="feed-tab active">Case Feed</div><div class="feed-tab">Details</div></div>'
+    +'<div class="feed-messages">'
+    +'<div class="msg-in" style="border-color:#fecaca;">'
+    +'<div class="msg-sender" style="color:#b91c1c;">Taylor R. — Customer 🚨</div>'
+    +'<div class="msg-text">I\'ve been locked out of my Client account. I received an email saying my password was changed but I didn\'t do that. I think someone has taken over my account. Please help ASAP!</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="compose-area">'
+    +'<textarea class="compose-field" id="reply-field" placeholder="Write a holding reply to Taylor..." style="min-height:50px;"></textarea>'
+    +'<div class="compose-footer">'
+    +'<button class="send-btn" onclick="sendFraudReply()">Send ✉️</button>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="detail-col">'
+    +'<div class="detail-section" style="background:#fff5f5;border-color:#fecaca;">'
+    +'<div class="detail-section-title" style="color:#b91c1c;">⚠ Account Status</div>'
+    +'<div class="detail-field"><div class="detail-field-label">Status</div><div class="detail-field-value" style="color:#b91c1c;">SUSPENDED</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Suspension Reason</div><div class="detail-field-value" style="color:#b91c1c;font-size:11px;">Fraud Suspension — Account Takeover</div></div>'
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Escalate Case</div>'
+    +'<div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Select escalation tier:</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px;" id="tier-buttons">'
+    +'<button class="case-header-btn" onclick="escalateTo(4)" style="text-align:left;font-size:11px;">Tier 4 — Standard Escalation</button>'
+    +'<button class="case-header-btn" onclick="escalateTo(7)" style="text-align:left;font-size:11px;">Tier 7 — Fraud / ATO / Identity Theft</button>'
+    +'<button class="case-header-btn" onclick="escalateTo(9)" style="text-align:left;font-size:11px;">Tier 9 — Chargebacks / ACH Returns</button>'
+    +'</div>'
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Internal Notes</div>'
+    +'<textarea class="internal-note-area" id="fraud-note" placeholder="Describe the reason for escalation..."></textarea>'
+    +'<button class="note-submit" onclick="submitFraudNote()">Post Note</button>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+  // Pulse fraud note and tier buttons to guide trainee
+  setTimeout(function(){
+    pulse('fraud-note');
+    pulse('tier-buttons');
+  }, 400);
+}
+
+var fraudNotePosted = false;
+function sendFraudReply() {
+  var f = document.getElementById('reply-field');
+  if(!f.value.trim()) return;
+  if(f.value.indexOf('Your Support Team') === -1) {
+    loseLife();
+    showCoach('error','✍️','Wrong Signature!','Remember: every email must end with <b>"Your Support Team"</b>. Edit your reply.',0,null);
+    return;
+  }
+  showCoach('info','✉️','Holding Reply Sent','Good — Taylor knows you\'re on it. Now you need to <b>escalate this case</b> to the correct tier and leave a detailed internal post describing the issue.',0,null);
+}
+
+function submitFraudNote() {
+  var n = document.getElementById('fraud-note');
+  if(!n.value.trim()) { showCoach('error','📝','Write a Note First!','Describe the ATO situation in the internal note — the Fraud team needs context when they receive this escalation.',0,null); return; }
+  fraudNotePosted = true;
+  n.style.borderColor = '#1BB152';
+  showCoach('success','📝','Note Posted!','The Fraud team will see this when they receive the escalation. Always be detailed — include the suspension reason and anything the customer told you.',0,null);
+}
+
+function escalateTo(tier) {
+  if(tier === 7) {
+    addXP(200);
+    setProgress(4);
+    showCoach('success','🔺','Correct — Tier 7!',
+      '<b>Account Takeover = Tier 7</b> every time. This also supports a <b>live chat transfer</b> if a chat was open.<br><br>'
+      +'✅ ATO → Tier 7 (Fraud)<br>'
+      +'✅ Identity Theft → Tier 7 (Fraud)<br>'
+      +'✅ Chargebacks / ACH Returns → Tier 9<br>'
+      +'⚠️ Tier 5/6 (RG & CX Recovery) requires extra steps: detailed note + Account Link + Share',
+      200, maybeDebrief(3, function(){ loadScenario(4); }));  // scenario index 4 = bonus bet
+  } else if(tier === 4) {
+    loseLife();
+    showCoach('error','🔺','Wrong Tier!',
+      '<b>Tier 4 is standard escalation</b> — it doesn\'t have live chat transfer capability and isn\'t the right team for ATO fraud cases.<br><br>Look at the suspension reason: <b>Account Takeover → Tier 7</b>.',
+      0, null);
+  } else if(tier === 9) {
+    loseLife();
+    showCoach('error','🔺','Wrong Tier!',
+      '<b>Tier 9 is for Chargebacks, Pre-Chargeback alerts, and ACH Returns</b> — not Account Takeover.<br><br>Taylor\'s case clearly shows <b>Account Takeover → Tier 7</b>.',
+      0, null);
+  }
+}
+
+// ── STEP 5: End of shift ──────────────────────────
+function setupStep5() {
+  showView('cases');
+  document.getElementById('case-count').textContent = '0';
+  document.getElementById('case-list-meta').textContent = '0 items · Great shift, Alex! 🎉';
+  setTimeout(function(){ pulse('omni-trigger'); }, 800);
+  document.getElementById('case-rows').innerHTML =
+    '<div style="text-align:center;padding:40px 20px;color:#9ca3af;">'
+    +'<div style="font-size:40px;margin-bottom:12px;">🌅</div>'
+    +'<div style="font-size:14px;font-weight:700;color:#374151;">It\'s 5:00pm. Shift\'s over.</div>'
+    +'<div style="font-size:12px;margin-top:8px;">Don\'t forget one last thing before you log off...</div>'
+    +'<div style="font-size:11px;margin-top:16px;color:#0070EB;font-weight:700;">👇 Set your Omni-Channel status at the bottom of the screen</div>'
+    +'</div>';
+}
+
+// ── FINAL SCORE ───────────────────────────────────
+function showFinalScore() {
+  var grade = G.xp >= 800 ? '★★★ PERFECT SHIFT' : G.xp >= 550 ? '★★ GREAT WORK' : '★ SHIFT SURVIVED';
+  var heartsLeft = '❤️'.repeat(G.lives) + '🖤'.repeat(3-G.lives);
+  var el = document.getElementById('main-content');
+  el.innerHTML =
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:32px 24px;text-align:center;gap:16px;background:#f9fafb;overflow-y:auto;">'
+    +'<div style="font-size:48px;">🏆</div>'
+    +'<div style="font-family:\'Press Start 2P\',monospace;font-size:14px;color:#1BB152;text-shadow:0 0 20px rgba(27,177,82,.3);line-height:1.6;">SHIFT COMPLETE!</div>'
+    +'<div class="score-card" id="score-card-wrap">'
+    +'<div style="text-align:center;">'
+    +'<div style="font-size:28px;">🏆</div>'
+    +'<div style="font-size:14px;font-weight:900;color:#374151;margin:6px 0 2px;">Alex — First Shift</div>'
+    +'<div class="score-grade-badge">'+grade+'</div>'
+    +'<div style="font-size:30px;font-weight:900;color:#0070EB;margin:6px 0;">'+G.xp+' XP</div>'
+    +'<div style="font-size:12px;color:#9ca3af;">Lives remaining: '+heartsLeft+'</div>'
+    +'</div>'
+    +'<div style="text-align:left;font-size:12px;color:#374151;line-height:2.1;border-top:1px solid #f3f4f6;padding-top:12px;margin-top:12px;">'
+    +'✅ Set Omni-Channel to <b>Available - All Channels</b><br>'
+    +'✅ Used template · correct <b>"Your Support Team"</b> sign-off<br>'
+    +'✅ Left an <b>internal note</b> before solving<br>'
+    +'✅ Set case status to <b>Solved</b><br>'
+    +'✅ <b>MFA Quick Text</b> in chat · no attachments via chat<br>'
+    +'✅ Escalated ATO to <b>Tier 7</b><br>'
+    +'✅ Applied <b>Bonus Bet</b> with correct product + Bet ID<br>'
+    +'✅ Used <b>Alley-Oop</b> · handled no-specialist flow<br>'
+    +'✅ Set status to <b>End of Shift</b>'
+    +'</div>'
+    +'<div class="score-actions">'
+    +'<button class="score-btn" onclick="copyScore()">📋 Copy Score</button>'
+    +'<button class="score-btn" onclick="window.print()">🖨️ Print</button>'
+    +'<button class="score-btn green" onclick="showScenarioMenu()">↺ Practice Again</button>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+}
+
+function copyScore() {
+  var grade = G.xp >= 800 ? 'PERFECT SHIFT ★★★' : G.xp >= 550 ? 'GREAT WORK ★★' : 'SHIFT SURVIVED ★';
+  var text = '🏆 ACE Adventure Simulator — Alex\'s First Shift\nScore: '+G.xp+' XP\nGrade: '+grade+'\nLives remaining: '+G.lives+'/3\nScenarios: 7/7\n— Client ACE Training';
+  if(navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function(){ showCoach('success','📋','Copied!','Score summary copied to clipboard. Paste it into your trainer chat!',0,null); });
+  } else {
+    var ta = document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    showCoach('success','📋','Copied!','Score summary copied to clipboard.',0,null);
+  }
+}
+
+// ── SCENARIO SELECT MENU ──────────────────────────
+function showScenarioMenu() {
+  var mc = document.getElementById('main-content');
+  if(!document.getElementById('scenario-intro')) rebuildViews(mc);
+  showView('cases');
+  document.getElementById('scenario-intro').style.display = 'none';
+  var menuEl = document.getElementById('scenario-menu');
+  var tilesHTML = SCENARIOS.map(function(s,i){
+    return '<div class="scenario-tile" onclick="document.getElementById(\'scenario-menu\').style.display=\'none\';loadScenario('+i+')">'
+      +'<div class="scenario-tile-emoji">'+s.emoji+'</div>'
+      +'<div class="scenario-tile-act">'+s.act+'</div>'
+      +'<div class="scenario-tile-title">'+s.title+'</div>'
+      +'</div>';
+  }).join('');
+  menuEl.innerHTML = '<div class="scenario-menu-box">'
+    +'<div class="scenario-menu-title">ACE SIMULATOR</div>'
+    +'<div class="scenario-menu-sub">Practice any scenario, or play the full shift from the start.</div>'
+    +'<div class="scenario-grid">'+tilesHTML+'</div>'
+    +'<button class="scenario-menu-start" onclick="document.getElementById(\'scenario-menu\').style.display=\'none\';loadScenario(0);">▶ Play Full Shift — Start from Step 1</button>'
+    +'</div>';
+  menuEl.style.display = 'flex';
+}
+
+function rebuildViews(mc) {
+  mc.innerHTML = ''
+    +'<div class="scenario-menu" id="scenario-menu" style="display:none;"></div>'
+    +'<div class="scenario-intro" id="scenario-intro">'
+    +'<div class="scenario-card"><span class="scenario-emoji" id="s-emoji">☀️</span><div class="scenario-act" id="s-act">LOADING...</div><div class="scenario-title" id="s-title">Loading...</div><div class="scenario-desc" id="s-desc">...</div><div id="s-discussion" style="display:none;"></div><button class="scenario-start" id="s-btn" onclick="startScenario()">▶ START</button></div>'
+    +'</div>'
+    +'<div id="view-cases" style="display:none;flex-direction:column;flex:1;">'
+    +'<div class="case-list-header"><div class="case-list-icon">💼</div><div><div class="case-list-label">Cases</div><div class="case-list-title">1 - My New, Open, On Hold Cases</div><div class="case-list-subtitle" id="case-list-sub">0 items</div></div><div class="case-header-btns"><div class="case-header-btn">Change Owner</div><div class="case-header-btn">Merge Cases</div><div class="case-header-btn primary">+ New</div></div></div>'
+    +'<div class="case-search-row"><div class="case-search-wrap"><div class="case-search">Search this list...</div></div><div class="icon-btn">⚙️</div><div class="icon-btn">≡</div><div class="icon-btn">🔄</div><div class="icon-btn">↕️</div><div class="icon-btn filter-btn">🔽</div></div>'
+    +'<div class="case-list-body"><div class="case-list-meta" id="case-list-meta">0 items</div><div id="case-rows"></div></div>'
+    +'</div>'
+    +'<div id="view-email" style="display:none;flex-direction:column;flex:1;"></div>'
+    +'<div id="view-chat"  style="display:none;flex-direction:column;flex:1;"></div>';
+}
+
+function restartGame() {
+  G = {xp:0,lives:3,step:0,omniStatus:'offline',scenario:0,noteWritten:false,replyDrafted:false,templateUsed:false,chatReplied:false,statusSet:false,facilitatorMode:G.facilitatorMode,presentationMode:G.presentationMode,aoReplied:false,aoTimer:null,pausePoint:0};
+  document.body.classList.toggle('trainer-presentation', G.presentationMode);
+  document.getElementById('xp').textContent = '0';
+  for(var i=0;i<3;i++) document.getElementById('h'+i).classList.remove('gone');
+  document.getElementById('pf').style.width = '0%';
+  document.getElementById('pl').textContent = 'Step 0 of 7';
+  document.getElementById('omni-label').textContent = 'Offline';
+  document.getElementById('omni-dot').className = 'omni-dot offline';
+  rebuildViews(document.getElementById('main-content'));
+  showScenarioMenu();
+}
+
+// ── REFRESH CUSTOMER DATA ─────────────────────────
+function refreshCustomerData() {
+  var btn = document.getElementById('refresh-btn');
+  if(!btn) return;
+  btn.classList.add('refreshing'); btn.innerHTML = '⏳ Refreshing...';
+  setTimeout(function(){
+    btn.classList.remove('refreshing');
+    btn.innerHTML = '✅ Refreshed';
+    btn.style.cssText += 'background:#f0fdf4;border-color:#1BB152;color:#065f46;';
+    showCoach('info','🔄','Why Refresh?',
+      '<b>Refresh Admin Web Attributes</b> pulls the latest account data from the backend — balance, promo eligibility, restriction flags, verification status.<br><br>'
+      +'📌 Always refresh before applying bonuses or making account changes. Data can be stale if the case was sitting in the queue for a while.',
+      0, null);
+  }, 1500);
+}
+
+// ── STEP 6: Bonus Bet ─────────────────────────────
+var bbApplied = false, bbNoteWritten = false, bbReplyDrafted = false;
+
+function setupStep6() {
+  bbApplied = false; bbNoteWritten = false; bbReplyDrafted = false;
+  showView('cases');
+  document.getElementById('case-count').textContent = '1';
+  document.getElementById('case-list-meta').textContent = '1 item · Bonus bet application needed — click to open';
+  document.getElementById('case-rows').innerHTML =
+    '<div class="case-row new-pulse" id="bb-case-row" onclick="openBonusBetCase()">'
+    +'<div class="case-channel email">📧</div>'
+    +'<div class="case-info"><div class="case-customer">Riley P.</div>'
+    +'<div class="case-subject">$10 bonus bet not showing after qualifying win</div>'
+    +'<div class="case-meta">Case #00145 · Sportsbook · Assigned to you · 5m ago</div></div>'
+    +'<div class="case-badge badge-open">OPEN</div><div class="case-time">5m ago</div>'
+    +'</div>';
+  setTimeout(function(){ pulse('bb-case-row'); }, 300);
+}
+
+function openBonusBetCase() {
+  unpulseAll();
+  showView('email');
+  var el = document.getElementById('view-email');
+  el.innerHTML =
+    '<div class="detail-header">'
+    +'<button class="back-btn" onclick="setupStep6()">← Back</button>'
+    +'<span class="detail-case-id">Case #00145</span>'
+    +'<span class="detail-status-badge badge-open">OPEN</span>'
+    +'<button class="refresh-btn" id="bb-refresh-btn" onclick="refreshBBData()" style="margin-left:auto;">🔄 Refresh Admin Web Attributes</button>'
+    +'</div>'
+    +'<div class="detail-body">'
+    +'<div class="bonus-panel">'
+    +'<div class="bonus-panel-header"><div class="bonus-panel-title">🎯 Bonus Bet</div><div class="bonus-panel-sub">Apply a bonus bet token</div></div>'
+    +'<div class="bonus-panel-body">'
+    +'<div class="bb-field"><div class="bb-label">Product</div>'
+    +'<select class="bb-select" id="bb-product-sel" onchange="onBBProductChange()">'
+    +'<option value="">-- Select --</option><option value="sportsbook">Sportsbook</option><option value="dfs">Daily Fantasy (DFS)</option><option value="casino">Casino</option>'
+    +'</select></div>'
+    +'<div class="bb-field" id="bb-betid-wrap" style="display:none;"><div class="bb-label">Bet ID</div>'
+    +'<input type="text" class="bb-input" id="bb-betid-input" placeholder="e.g. BET-2024-00891" /></div>'
+    +'<button class="bb-apply" id="bb-apply-btn" onclick="applyBonusBet()" style="display:none;">Apply Bonus Bet ✓</button>'
+    +'<div class="bb-confirmation" id="bb-confirmation">'
+    +'<div class="bb-conf-title">✅ Confirm Application</div>'
+    +'<div class="bb-conf-row"><b>Product:</b> <span id="bb-conf-product">—</span></div>'
+    +'<div class="bb-conf-row"><b>Bet ID:</b> <span id="bb-conf-betid">—</span></div>'
+    +'<div class="bb-conf-row"><b>Customer:</b> RileyP_22</div>'
+    +'<div class="bb-conf-btns">'
+    +'<button class="bb-conf-confirm" onclick="confirmBonusBet()">✓ Confirm</button>'
+    +'<button class="bb-conf-cancel" onclick="document.getElementById(\'bb-confirmation\').style.display=\'none\'">Cancel</button>'
+    +'</div></div>'
+    +'<div class="bb-applied-badge" id="bb-applied-badge" style="display:none;">✅ Bonus Bet Applied!</div>'
+    +'</div></div>'
+    +'<div class="feed-col">'
+    +'<div class="feed-tabs"><div class="feed-tab active">Case Feed</div><div class="feed-tab">Details</div></div>'
+    +'<div class="feed-messages" id="feed-msgs">'
+    +'<div class="msg-in"><div class="msg-sender">Riley P. — Customer</div>'
+    +'<div class="msg-text">Hi, I placed a qualifying bet on Saturday and it won, but my $10 bonus bet still hasn\'t appeared. My account is RileyP_22 and the Bet ID is BET-2024-00891. Can you apply it manually? Thanks</div></div>'
+    +'</div>'
+    +'<div class="compose-area">'
+    +'<div class="compose-toolbar"><div class="toolbar-btn">B</div><div class="toolbar-btn"><i>I</i></div><div class="toolbar-sep"></div>'
+    +'<div style="position:relative;"><button class="template-btn" onclick="toggleBBTemplates()">📄 Insert Template ▾</button>'
+    +'<div class="template-picker" id="bb-template-picker" style="display:none;">'
+    +'<div class="template-option" onclick="useBBTemplate()">🎯 Bonus Bet — Applied &amp; Resolved<div class="tmpl-sub">Confirms token applied</div></div>'
+    +'</div></div></div>'
+    +'<textarea class="compose-field" id="bb-reply-field" placeholder="Write a reply to Riley..."></textarea>'
+    +'<div class="compose-footer"><button class="send-btn" onclick="sendBBReply()">Send ✉️</button>'
+    +'<div class="sig-line" id="bb-sig-preview">Signature: —</div></div>'
+    +'</div></div>'
+    +'<div class="detail-col">'
+    +'<div class="detail-section"><div class="detail-section-title">Case Details</div>'
+    +'<div class="detail-field"><div class="detail-field-label">Customer</div><div class="detail-field-value">Riley P.</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Customer ID</div><div class="detail-field-value">RileyP_22</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Product</div><div class="detail-field-value">Sportsbook</div></div></div>'
+    +'<div class="detail-section"><div class="detail-section-title">Case Status</div>'
+    +'<select class="status-select" id="bb-case-status"><option value="">-- Select Status --</option><option value="solved">Solved</option><option value="pending">Pending</option><option value="on-hold">On Hold</option></select></div>'
+    +'<div class="detail-section"><div class="detail-section-title">Internal Notes</div>'
+    +'<textarea class="internal-note-area" id="bb-internal-note" placeholder="Note the Bet ID applied..."></textarea>'
+    +'<button class="note-submit" onclick="submitBBNote()">Post Note</button></div>'
+    +'<div class="detail-section"><button class="solve-btn" id="bb-solve-btn" onclick="solveBBCase()" disabled>Complete Case</button>'
+    +'<div style="font-size:10px;color:#9ca3af;margin-top:6px;" id="bb-solve-hint">Apply bonus bet first</div></div>'
+    +'</div></div>';
+  // Start guidance: pulse Refresh first, then product selector
+  setTimeout(function(){ pulse('bb-refresh-btn'); }, 300);
+}
+
+function refreshBBData() {
+  var btn = document.getElementById('bb-refresh-btn');
+  unpulse('bb-refresh-btn');
+  btn.classList.add('refreshing'); btn.innerHTML = '⏳ Refreshing...';
+  setTimeout(function(){
+    btn.classList.remove('refreshing'); btn.innerHTML = '✅ Refreshed';
+    btn.style.background='#f0fdf4'; btn.style.borderColor='#1BB152'; btn.style.color='#065f46';
+    showCoach('info','🔄','Data Refreshed!','Account data is now up to date. Riley\'s account confirms no bonus bet token — you\'ll need to apply it manually via the <b>Bonus Bet</b> panel on the left.',0,
+      function(){ pulse('bb-product-sel'); });
+  }, 1200);
+}
+function toggleBBTemplates(){ var p=document.getElementById('bb-template-picker'); p.style.display=p.style.display==='none'?'block':'none'; }
+function useBBTemplate(){
+  document.getElementById('bb-template-picker').style.display='none';
+  document.getElementById('bb-reply-field').value="Hi Riley,\n\nThank you for reaching out! I've manually applied your $10 bonus bet token to your Sportsbook account — it should now be visible under Bonuses.\n\nSorry for the inconvenience. Let us know if you need anything else.\n\nYour Support Team";
+  document.getElementById('bb-sig-preview').textContent='Signature: ✅ Your Support Team';
+  document.getElementById('bb-sig-preview').style.color='#1BB152';
+}
+function onBBProductChange(){
+  var val=document.getElementById('bb-product-sel').value;
+  if(val==='dfs'||val==='casino'){
+    loseLife(); document.getElementById('bb-product-sel').value='';
+    showCoach('error','🎯','Wrong Product!','This is a <b>Sportsbook</b> case. Always match the product to the case before applying a bonus bet.',0,null); return;
+  }
+  if(val==='sportsbook'){
+    unpulse('bb-product-sel');
+    document.getElementById('bb-betid-wrap').style.display='block';
+    document.getElementById('bb-apply-btn').style.display='block';
+    showCoach('info','🎯','Product Selected!','Good — <b>Sportsbook</b> is correct. Now enter the Bet ID from Riley\'s message, then click Apply.',0,
+      function(){ pulse('bb-betid-input'); });
+  }
+}
+function applyBonusBet(){
+  var betid=document.getElementById('bb-betid-input').value.trim();
+  if(!betid){ document.getElementById('bb-betid-input').classList.add('required-pulse'); setTimeout(function(){document.getElementById('bb-betid-input').classList.remove('required-pulse');},1000); showCoach('error','🎯','Enter a Bet ID!','Check Riley\'s message — they gave you the Bet ID.',0,null); return; }
+  unpulse('bb-betid-input'); unpulse('bb-apply-btn');
+  document.getElementById('bb-conf-product').textContent='Sportsbook';
+  document.getElementById('bb-conf-betid').textContent=betid;
+  document.getElementById('bb-confirmation').style.display='block';
+}
+function confirmBonusBet(){
+  bbApplied=true;
+  document.getElementById('bb-confirmation').style.display='none';
+  document.getElementById('bb-apply-btn').style.display='none';
+  document.getElementById('bb-applied-badge').style.display='block';
+  var betid=document.getElementById('bb-betid-input').value.trim();
+  var msgs=document.getElementById('feed-msgs');
+  msgs.innerHTML+='<div class="msg-in" style="background:#f0fdf4;border-color:#bbf7d0;"><div class="msg-sender" style="color:#1BB152;">✅ System — Bonus Bet Applied</div><div class="msg-text">Bonus bet applied to RileyP_22 for Bet ID <b>'+betid+'</b> (Sportsbook).</div></div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  addXP(100); checkBBSolveReady();
+  showCoach('success','🎯','Bonus Bet Applied!','Token confirmed. Now: 1️⃣ Send Riley a reply · 2️⃣ Internal note with Bet ID · 3️⃣ Set Solved and complete.',100,
+    function(){ pulse('bb-reply-field'); });
+}
+function sendBBReply(){
+  var field=document.getElementById('bb-reply-field');
+  if(!field.value.trim()){ field.classList.add('highlight-error'); setTimeout(function(){field.classList.remove('highlight-error');},600); showCoach('error','✍️','Reply is Empty!','Write a confirmation reply. Use the template button.',0,null); return; }
+  if(!bbApplied){ showCoach('error','🎯','Apply Bonus Bet First!','Use the panel on the left before sending the confirmation.',0,null); return; }
+  if(field.value.indexOf('Your Support Team')===-1){
+    loseLife();
+    var msgs=document.getElementById('feed-msgs');
+    if(msgs){ msgs.innerHTML+='<div class="msg-supervisor"><div class="msg-sender">👔 Sam (Team Lead) — Internal DM</div><div class="msg-text">Hey Alex — every reply needs to end with <b>"Your Support Team"</b>. Use the template button. 👍</div></div>'; msgs.scrollTop=msgs.scrollHeight; }
+    showCoach('error','✍️','Wrong Signature!','Every reply must end with <b>"Your Support Team"</b>.',0,null); return;
+  }
+  var msgs=document.getElementById('feed-msgs');
+  msgs.innerHTML+='<div class="msg-in" style="align-self:flex-end;background:#eff6ff;border-color:#bfdbfe;"><div class="msg-sender" style="color:#1BB152;">You (Alex) — Sent</div><div class="msg-text">'+field.value.replace(/\n/g,'<br>')+'</div></div>';
+  unpulse('bb-reply-field');
+  msgs.scrollTop=msgs.scrollHeight; field.value=''; bbReplyDrafted=true; addXP(50); checkBBSolveReady();
+  showCoach('success','✉️','Reply Sent!','Good — Riley has been notified. Leave an <b>internal note</b> with the Bet ID, then set the status to <b>Solved</b> and complete the case.',50,
+    function(){ pulse('bb-internal-note'); });
+}
+function submitBBNote(){
+  var note=document.getElementById('bb-internal-note');
+  if(!note.value.trim()){ note.classList.add('required-pulse'); setTimeout(function(){note.classList.remove('required-pulse');},1000); showCoach('error','📝','Note is Empty!','Document the Bet ID you applied.',0,null); return; }
+  unpulse('bb-internal-note');
+  bbNoteWritten=true; note.style.borderColor='#1BB152'; addXP(50); checkBBSolveReady();
+  showCoach('success','📝','Note Posted!','Good — always include the Bet ID in your note for bonus bet cases.',50,
+    function(){ pulse('bb-case-status'); pulse('bb-solve-btn'); });
+}
+function checkBBSolveReady(){
+  var ready=bbApplied&&bbReplyDrafted;
+  document.getElementById('bb-solve-btn').disabled=!ready;
+  document.getElementById('bb-solve-hint').textContent=!bbApplied?'Apply bonus bet first':!bbReplyDrafted?'Send a reply first':'Ready to complete!';
+  document.getElementById('bb-solve-hint').style.color=ready?'#1BB152':'#9ca3af';
+}
+function solveBBCase(){
+  var st=document.getElementById('bb-case-status').value;
+  if(!st){ showCoach('error','📋','Select a Status!','',0,null); return; }
+  if(st!=='solved'){ loseLife(); showCoach('error','📋','Wrong Status!','Token applied and Riley notified — this is fully resolved. Set it to <b>Solved</b>.',0,null); return; }
+  addXP(150); setProgress(5); document.getElementById('case-count').textContent='0';
+  showCoach('success','✅','Bonus Bet Solved!','Rules: ✅ Match product to case · ✅ Enter Bet ID · ✅ Review confirmation · ✅ Reply + note + Solved',150,maybeDebrief(4, function(){ loadScenario(5); }));
+}
+
+// ── STEP 7: Alley-Oop ─────────────────────────────
+var aoMessageSent = false;
+
+function setupStep7() {
+  aoMessageSent = false; G.aoReplied = false;
+  showView('cases');
+  document.getElementById('case-count').textContent = '1';
+  document.getElementById('case-list-meta').textContent = '1 item · Complex case — click to open';
+  document.getElementById('case-rows').innerHTML =
+    '<div class="case-row new-pulse" id="ao-case-row" onclick="openAlleyOopCase()">'
+    +'<div class="case-channel email">📧</div>'
+    +'<div class="case-info"><div class="case-customer">Morgan T.</div>'
+    +'<div class="case-subject">Parlay voided mid-game — requesting stake refund</div>'
+    +'<div class="case-meta">Case #00146 · Sportsbook · Assigned to you · 8m ago</div></div>'
+    +'<div class="case-badge badge-open">OPEN</div><div class="case-time">8m ago</div>'
+    +'</div>';
+  setTimeout(function(){ pulse('ao-case-row'); }, 300);
+}
+
+function openAlleyOopCase() {
+  unpulseAll();
+  showView('email');
+  var el = document.getElementById('view-email');
+  el.innerHTML =
+    '<div class="detail-header"><button class="back-btn" onclick="setupStep7()">← Back</button>'
+    +'<span class="detail-case-id">Case #00146</span>'
+    +'<span class="detail-status-badge badge-open">OPEN</span></div>'
+    +'<div class="detail-body" style="position:relative;" id="ao-detail-body">'
+    +'<div class="feed-col">'
+    +'<div class="feed-tabs"><div class="feed-tab active">Case Feed</div></div>'
+    +'<div class="feed-messages" id="feed-msgs">'
+    +'<div class="msg-in"><div class="msg-sender">Morgan T. — Customer</div>'
+    +'<div class="msg-text">Hi — I had a 5-leg parlay last night and one leg was voided mid-game (the game was abandoned). I understand the parlay recalculates without the voided leg, but the odds shifted significantly and I ended up losing. Can I get a refund of my original stake since the game was abandoned? This doesn\'t seem fair.</div></div>'
+    +'</div>'
+    +'<div class="compose-area">'
+    +'<div class="compose-toolbar"><div class="toolbar-btn">B</div><div class="toolbar-btn"><i>I</i></div></div>'
+    +'<textarea class="compose-field" id="ao-reply-field" placeholder="Write a holding reply to Morgan..." style="min-height:50px;"></textarea>'
+    +'<div class="compose-footer"><button class="send-btn" onclick="sendAOReply()">Send ✉️</button>'
+    +'<div class="sig-line">Unsure? Use Alley-Oop ↙ in the bottom bar</div></div>'
+    +'</div></div>'
+    +'<div class="detail-col">'
+    +'<div class="detail-section"><div class="detail-section-title">Case Details</div>'
+    +'<div class="detail-field"><div class="detail-field-label">Customer</div><div class="detail-field-value">Morgan T.</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Product</div><div class="detail-field-value">Sportsbook</div></div>'
+    +'<div class="detail-field"><div class="detail-field-label">Issue</div><div class="detail-field-value" style="font-size:11px;">Voided leg / parlay</div></div></div>'
+    +'<div class="detail-section"><div class="detail-section-title">Specialist Help</div>'
+    +'<div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Not sure how to handle this case?</div>'
+    +'<button class="case-header-btn" onclick="openAlleyOopPanel()" style="width:100%;text-align:left;font-size:11px;">🤝 Start Alley-Oop Session</button></div>'
+    +'<div class="detail-section"><div class="detail-section-title">Case Status</div>'
+    +'<select class="status-select" id="ao-case-status"><option value="">-- Select Status --</option><option value="pending">Pending</option><option value="solved">Solved</option><option value="escalated">Escalated</option></select></div>'
+    +'<div class="detail-section"><button class="solve-btn" id="ao-solve-btn" onclick="solveAOCase()" disabled>Complete Case</button>'
+    +'<div style="font-size:10px;color:#9ca3af;margin-top:6px;" id="ao-solve-hint">Use Alley-Oop + send reply first</div></div>'
+    +'</div></div>';
+  // Pulse the Alley-Oop button in the bottom bar
+  setTimeout(function(){ pulse('alley-oop-btn'); }, 400);
+}
+
+function openAlleyOopPanel() {
+  unpulse('alley-oop-btn');
+  var body = document.getElementById('ao-detail-body');
+  if(document.getElementById('ao-panel')) return;
+  var panel = document.createElement('div');
+  panel.className='ao-panel'; panel.id='ao-panel';
+  panel.innerHTML =
+    '<div class="ao-header"><span style="font-size:16px;">🤝</span><span class="ao-title">Alley-Oop — Specialist Support</span><button class="ao-close" onclick="closeAOPanel()">✕</button></div>'
+    +'<div class="ao-body" id="ao-body"><div class="ao-bubble-system">Describe the issue and connect with a specialist who can help in real time.</div></div>'
+    +'<div class="ao-compose"><textarea class="ao-input" id="ao-input" placeholder="Describe the issue for the specialist..." rows="1"></textarea><button class="ao-send" onclick="sendAOMessage()">➤</button></div>';
+  body.appendChild(panel);
+  showCoach('info','🤝','Alley-Oop — Specialist Chat','Type your question about Morgan\'s voided parlay and hit send to request a specialist. If none are available, you\'ll learn what to do next.',0,null);
+}
+
+function closeAOPanel(){ var p=document.getElementById('ao-panel'); if(p) p.remove(); }
+
+function sendAOMessage(){
+  var inp=document.getElementById('ao-input');
+  if(!inp||!inp.value.trim()) return;
+  var body=document.getElementById('ao-body');
+  body.innerHTML+='<div class="ao-msg-agent"><div class="ao-bubble-agent">'+inp.value+'</div><div class="ao-time" style="text-align:right;">Alex · just now</div></div>';
+  body.scrollTop=body.scrollHeight;
+  inp.value=''; inp.disabled=true; aoMessageSent=true;
+  setTimeout(function(){
+    body.innerHTML+='<div id="ao-connecting" class="ao-connecting"><div style="font-size:12px;font-weight:700;margin-bottom:8px;">Searching for available specialist…</div><div class="ao-connecting-dots"><span></span><span></span><span></span></div><button class="ao-skip-btn" onclick="skipAOWait()">⏩ Skip wait</button></div>';
+    body.scrollTop=body.scrollHeight;
+    G.aoTimer=setTimeout(skipAOWait,8000);
+  },600);
+}
+
+function skipAOWait(){
+  clearTimeout(G.aoTimer);
+  var conn=document.getElementById('ao-connecting');
+  if(!conn) return;
+  conn.remove();
+  var body=document.getElementById('ao-body');
+  body.innerHTML+='<div class="ao-bubble-system">⚠️ No specialists available right now. Estimated wait: 4–6 minutes.<br><br>You can continue waiting, or handle this independently — set the case to <b>Pending</b> and send a holding reply while you check the voided-leg policy.</div>';
+  body.scrollTop=body.scrollHeight;
+  addXP(75); checkAOSolveReady();
+  showCoach('info','🤝','No Specialist Available',
+    'This happens during busy periods. The right move:<br><br>'
+    +'1️⃣ Send Morgan a <b>holding reply</b> ("I\'m investigating")<br>'
+    +'2️⃣ Set the case to <b>Pending</b><br>'
+    +'3️⃣ Check the voided-leg policy in your knowledge base<br><br>'
+    +'📌 Never leave a customer without a reply just because Alley-Oop didn\'t connect.',
+    75, function(){ pulse('ao-reply-field'); });
+}
+
+function sendAOReply(){
+  var field=document.getElementById('ao-reply-field');
+  if(!field.value.trim()){ field.classList.add('highlight-error'); setTimeout(function(){field.classList.remove('highlight-error');},600); showCoach('error','✍️','Write a Reply!','Morgan needs a holding reply. Even a brief message buys time.',0,null); return; }
+  if(!aoMessageSent){ showCoach('error','🤝','Use Alley-Oop First!','Open the Alley-Oop panel from the bottom bar and send a question before replying to Morgan.',0,null); return; }
+  var msgs=document.getElementById('feed-msgs');
+  msgs.innerHTML+='<div class="msg-in" style="align-self:flex-end;background:#eff6ff;border-color:#bfdbfe;"><div class="msg-sender" style="color:#1BB152;">You (Alex) — Sent</div><div class="msg-text">'+field.value.replace(/\n/g,'<br>')+'</div></div>';
+  msgs.scrollTop=msgs.scrollHeight; field.value=''; G.aoReplied=true; addXP(75); checkAOSolveReady();
+  showCoach('success','✉️','Holding Reply Sent!','Good — Morgan knows you\'re looking into it. Now set the status and complete the case.',75,null);
+}
+
+function checkAOSolveReady(){
+  if(aoMessageSent&&G.aoReplied){ document.getElementById('ao-solve-btn').disabled=false; document.getElementById('ao-solve-hint').textContent='Ready to complete!'; document.getElementById('ao-solve-hint').style.color='#1BB152'; }
+}
+
+function solveAOCase(){
+  var st=document.getElementById('ao-case-status').value;
+  if(!st){ showCoach('error','📋','Select a Status!','What status best fits this case right now?',0,null); return; }
+  if(st==='solved'){ loseLife(); showCoach('error','📋','Not Solved Yet!','The voided-leg question isn\'t fully answered — set it to <b>Pending</b> while you investigate.',0,null); return; }
+  addXP(150); setProgress(6); document.getElementById('case-count').textContent='0';
+  showCoach('success','🤝','Alley-Oop Scenario Complete!',
+    '✅ Use Alley-Oop when you\'re unsure — don\'t guess<br>'
+    +'✅ If no specialist: <b>holding reply + Pending</b><br>'
+    +'✅ Never leave a customer without a response<br>'
+    +'📌 Alley-Oop sessions are logged by supervisors',
+    150, maybeDebrief(5, function(){ loadScenario(6); }));
+}
+
+// ── FACILITATOR DATA ──────────────────────────────
+var FACILITATOR_DATA = [
+  { // Step 1: Set Omni Status
+    discussionQ: "Before we start — what do you think happens to your cases if you forget to change your status at the end of your shift?",
+    notes: [
+      "The Omni-Channel widget is in the bottom-left corner of ACE — agents update this throughout the entire shift",
+      "Email-only shift = <b>Available - Email, Web, Phone</b>. All Channels = email + chat + phone. Chat-only = Available - Chat",
+      "Agents are expected to update status throughout the day: Break, Lunch, 1:1, Meeting, Training — supervisors track this in real time",
+      "Emails route 2 at a time. Chats route 2 at a time during training, 2 when out of training (more with supervisor approval)"
+    ],
+    mistakes: [
+      "Leaving status as Available at end of shift — cases keep routing all evening and create a 'ghost queue'",
+      "Using Break or Training status at the start of a shift instead of an Available status",
+      "Selecting Available - All Channels when only email work is assigned"
+    ],
+    watchFor: "Does the trainee scan all options before selecting, or do they click the first Available they see?"
+  },
+  { // Step 2: Email Case
+    discussionQ: "Why do you think Client requires templates instead of letting agents write every reply from scratch?",
+    notes: [
+      "Completing a case: (1) Set status → (2) Confirm Product, State, Issue Category, Issue Type → (3) Acknowledge CSAT prompt → (4) Internal post is mandatory before solving",
+      "Signature rule: all emails signed as <b>'Your Support Team'</b> only. Do not manually change to a personal name. No other pre-set signature blocks",
+      "Use the <b>!Greeting/Signoff</b> template as a base when drafting, or any template that fits the response",
+      "<b>Solved</b> = not requesting anything from customer, issue resolved. <b>Pending</b> = requesting further info from customer, expecting them to reply back"
+    ],
+    mistakes: [
+      "Signing with their own name instead of 'Your Support Team'",
+      "Setting case to Pending when the issue is already fully resolved (customer doesn't need to reply back)",
+      "Forgetting the internal post before solving — it is always required before completing a case"
+    ],
+    watchFor: "Does the trainee use the template, or try to write from scratch and miss the signature?"
+  },
+  { // Step 3: Live Chat
+    discussionQ: "Can you think of a reason why agents can't send attachments to customers through chat — but customers can send them to us?",
+    notes: [
+      "MFA Quick Text sends the unlink action and pre-fills the correct message automatically — one click",
+      "Agents CANNOT send attachments in chat. Customers CAN send attachments to agents. File needs = follow up via email",
+      "<b>CSAT change:</b> agents are NO LONGER required to send CSAT Survey Quick Text before ending chat — survey goes out automatically",
+      "<b>Ending a chat:</b> once resolved, ask if there's anything else → wait 30 seconds → thank customer → advise disconnecting → disconnect if no response",
+      "<b>Ghosted chat (Scenario A):</b> customer ends chat with zero messages → tab closes automatically, case = Solved with Issue Type = Unresponsive, set by automation",
+      "<b>Ghosted chat (Scenario B):</b> customer sent at least one message, then ends chat → tab glows red → agent completes after-chat work normally, CANNOT select Unresponsive"
+    ],
+    mistakes: [
+      "Trying to send an attachment through chat — must follow up via email",
+      "Manually selecting 'Unresponsive' as the issue type when a customer has sent at least one message (Scenario B)",
+      "Not waiting 30 seconds before disconnecting after asking 'Is there anything else?'"
+    ],
+    watchFor: "Does the trainee select the correct Issue Type before ending the chat?"
+  },
+  { // Step 4: Fraud Escalation
+    discussionQ: "If you saw 'Account Takeover' in the case details, what would your instinct be? What team do you think handles that?",
+    notes: [
+      "The suspension reason is in the right panel — always read it before choosing an escalation tier",
+      "<b>ATO / Account Takeover → Tier 7.</b> Suspected ATO (live status, customer reports unauthorized activity) → Suspend account first, then transfer to Tier 7",
+      "<b>Identity Theft → Tier 7.</b> Both also support live chat transfer — but only if at least one agent is available in Tier 7",
+      "<b>Chargebacks / ACH Returns / Pre-Chargeback (Ethoca) Alert → Tier 9</b>",
+      "<b>Tier 5/6 (RG & CX Recovery):</b> requires extra steps — leave detailed internal post + attach Account Link + click Share before escalating",
+      "Standard escalation (Tier 4): change status to Escalated → confirm Product/State/IC/IT → select tier"
+    ],
+    mistakes: [
+      "Escalating ATO to Tier 4 — that's standard escalation and doesn't reach the fraud team",
+      "Escalating ATO to Tier 9 — Tier 9 is for Chargebacks and ACH Returns only",
+      "Skipping the internal post on escalations — always leave a detailed note describing the issue and reason"
+    ],
+    watchFor: "Does the trainee read the suspension reason first, or jump straight to picking a tier?"
+  },
+  { // Step 5: Bonus Bet
+    discussionQ: "Where would you expect to find the Bonus Bet tool in ACE? Why do you think it's there and not in the compose area?",
+    notes: [
+      "Bonus Bet component is in the <b>LEFT panel</b> below Case Details — only visible when case is NOT Solved or Closed AND state is NOT Ontario",
+      "Product must match case type: Sportsbook case = Sportsbook. DFS = DFS. Casino = Casino",
+      "Bet ID is required for all Sportsbook labels <em>except</em> Refer a Friend",
+      "No Bet ID? → Check CPP for Promo ID. No Promo ID either? → Use <b>'OTC - Tech Issue'</b> or <b>'OTC - Credit Request'</b> in the Bet ID field",
+      "All Bonus Bet activity auto-logs in AdminWeb on the customer's profile — no manual note to AdminWeb needed"
+    ],
+    mistakes: [
+      "Selecting DFS or Casino for a Sportsbook case",
+      "Leaving the Bet ID blank without checking the customer's message or CPP",
+      "Trying to apply a Bonus Bet after setting the case to Solved — the component disappears"
+    ],
+    watchFor: "Does the trainee check the customer's message for the Bet ID, or leave it blank?"
+  },
+  { // Step 6: Alley-Oop
+    discussionQ: "If you were unsure how to handle a case and used Alley-Oop but no specialist was available — what would you do next?",
+    notes: [
+      "Navigate: service console → bottom bar → <b>'Alley-Oop: Live Agent Assist'</b>. If not visible, click 'edit' at the bottom of the list to add it",
+      "<b>Session rules:</b> only ONE messaging session at a time. Cannot combine multiple issues or cases in one session",
+      "<b>No specialist after 3 minutes:</b> end session → notify customer of follow-up via email → place case On Hold → re-escalate later",
+      "Purpose: chat directly with specialists in real time, reduces switching between windows and programs"
+    ],
+    mistakes: [
+      "Waiting indefinitely without notifying the customer when no specialist is available",
+      "Setting the case to Solved when the underlying question hasn't actually been answered",
+      "Trying to use Alley-Oop for two different cases in the same session"
+    ],
+    watchFor: "Does the trainee know the correct steps for the 'no specialist available' flow?"
+  },
+  { // Step 7: End of Shift
+    discussionQ: "What do you think happens to a customer whose case routes to an agent who has already gone home for the day?",
+    notes: [
+      "<b>'End of Shift'</b> is the only correct end-of-day status — stops routing and signals to supervisors you've clocked off",
+      "Staying on any Available status after your shift = cases keep routing to you all evening (ghost queue)",
+      "Update status throughout the day: Break, Lunch, 1:1, Meeting, Training, Follow-Up Work — supervisors use these to manage team availability in real time",
+      "The <b>Agent Dashboard</b> (Home section) shows: active cases with links, rated cases, CSAT comments, AHT metrics — agents can review their own performance"
+    ],
+    mistakes: [
+      "Leaving on Available - All Channels when logging off",
+      "Choosing Break or Personal instead of End of Shift at the end of the day",
+      "Not going Offline — Break and Personal are temporary away statuses, not end-of-shift ones"
+    ],
+    watchFor: "Does the trainee go straight for 'End of Shift', or do they hesitate and look at other options?"
+  }
+];
+
+var DEBRIEF_DATA = [
+  { // After Step 1
+    title:"Omni-Channel Status",
+    points:[
+      "<b>Available - Email, Web, Phone</b> routes email and web cases. <b>Available - All Channels</b> adds live chat. <b>Available - Chat</b> routes chat only. Always match your status to your workload.",
+      "Update your status throughout the shift: <b>Break, Lunch, 1:1, Meeting, Training, Follow-Up Work</b> — supervisors track this in real time.",
+      "<b>End of Shift</b> must be set before logging off. Staying Available creates a ghost queue — cases route to you all evening with no one to answer them."
+    ],
+    question:"What's the difference between 'Break' and 'End of Shift'? If you're on Break, are cases still routing to you?"
+  },
+  { // After Step 2
+    title:"Handling an Email Case",
+    points:[
+      "Always use a template — they auto-fill the correct <b>'Your Support Team'</b> sign-off and save time. Never sign with your own name.",
+      "<b>Completing a case:</b> set status → confirm Product/State/Issue Category/Issue Type → acknowledge CSAT prompt (when Solving) → always leave an <b>internal post</b> before completing.",
+      "<b>Solved</b> = not expecting the customer to reply back. <b>Pending</b> = you've requested information and are waiting for the customer to respond. <b>On Hold</b> = waiting on a third party (traders, D&P), not the customer."
+    ],
+    question:"Give me an example of a case you'd set to Pending. Now give me one for On Hold. What's different about those two situations?"
+  },
+  { // After Step 3
+    title:"Handling Live Chat",
+    points:[
+      "MFA can be unlinked via <b>Quick Text in chat</b> — one click, no manual message needed.",
+      "Agents <b>cannot send attachments in chat</b>. Customers can send attachments to you. If a file is needed, follow up via email.",
+      "<b>CSAT:</b> agents no longer need to send CSAT Quick Text before ending chat — survey sends automatically. <b>Ending a chat:</b> ask 'anything else?' → wait 30 seconds → thank customer → advise disconnecting → disconnect.",
+      "<b>Ghosted chat — Scenario A</b> (zero customer messages): tab closes automatically, case = Solved with Unresponsive set by automation. <b>Scenario B</b> (at least one customer message): tab glows red, agent completes after-chat work, CANNOT select Unresponsive manually."
+    ],
+    question:"A customer connects to your chat, you send one message, and they end the chat without replying. Is this Scenario A or B? What happens to the case?"
+  },
+  { // After Step 4
+    title:"Escalations",
+    points:[
+      "<b>ATO / Account Takeover → Tier 7.</b> Suspected ATO (live account, customer reports unauthorized activity) → suspend account first, then Tier 7. Both support live chat transfer.",
+      "<b>Identity Theft → Tier 7. Chargebacks / ACH Returns / Pre-Chargeback (Ethoca) Alert → Tier 9.</b>",
+      "<b>Tier 5/6 (RG & CX Recovery):</b> detailed internal post + attach Account Link + click 'Share' — then escalate.",
+      "Every escalation needs a <b>detailed internal post</b> — suspension reason, customer context, case numbers. The receiving team has no other context."
+    ],
+    question:"What goes in a Tier 7 escalation internal post? What happens if the fraud team receives the case without any context note?"
+  },
+  { // After Step 5
+    title:"Applying a Bonus Bet",
+    points:[
+      "Bonus Bet component is in the <b>left panel</b>. Case must NOT be Solved or Closed AND state must NOT be Ontario for it to appear.",
+      "Always <b>match the product to the case type.</b> Bet ID is required for Sportsbook (except Refer a Friend labels).",
+      "No Bet ID? Check CPP for Promo ID. No Promo ID either? Enter <b>'OTC - Tech Issue'</b> or <b>'OTC - Credit Request'</b> in the Bet ID field. All activity auto-logs in AdminWeb."
+    ],
+    question:"What do you enter in the Bet ID field if the customer didn't provide one and there's no Promo ID in CPP? What would happen if you left it blank?"
+  },
+  { // After Step 6
+    title:"Alley-Oop",
+    points:[
+      "<b>One session at a time</b> — cannot combine multiple cases in a single Alley-Oop session. Monitor sessions and end them once resolved.",
+      "No specialist after 3 minutes: <b>end session → notify customer via email → place On Hold → re-escalate later.</b>",
+      "Never leave a customer without a response just because Alley-Oop didn't connect. A holding reply is always the next step."
+    ],
+    question:"When would you use Alley-Oop instead of escalating directly to a tier? What's the key difference in how those two options work?"
+  },
+  { // After Step 7 (final)
+    title:"Shift Complete",
+    points:[
+      "<b>End of Shift</b> stops case routing entirely — the only correct end-of-day status. Not Break. Not Personal. Not just logging out.",
+      "Ghost queue = cases routing to an offline agent = unanswered customers, worse CSAT, metrics hit for you and your team.",
+      "The <b>Agent Dashboard</b> (Home tab in ACE) shows your active cases, rated cases, CSAT comments, and AHT — check it regularly."
+    ],
+    question:"Walk me through every Omni-Channel status you'd use across a full shift — from the moment you log in to the moment you log off."
+  }
+];
+
+// ── PAUSE DATA — mid-scenario discussion questions ─
+var PAUSE_DATA = [
+  // Step 1: Omni-Channel
+  [
+    {
+      trigger: "Console just opened",
+      question: "Look at the bottom bar — what status is Alex on right now? What happens if a case comes in while you're in that status?",
+      context: "Alex is Offline. Cases will not route to an Offline agent. The agent must set an Available status before any work comes in."
+    },
+    {
+      trigger: "Omni-Channel dropdown open",
+      question: "Count the Available options. If Alex's shift is email-only today, which one would you pick — and which ones would be wrong?",
+      context: "Available - Email, Web, Phone = email + webform only. Available - All Channels adds live chat on top of that. Available - Chat routes only chat. Always match your status to your workload."
+    }
+  ],
+  // Step 2: Email Case
+  [
+    {
+      trigger: "Case list — before opening",
+      question: "Before we even open this case — what can you already tell from the case row? What's the channel, the customer, and what are they asking about?",
+      context: "The case row shows: email channel, customer name (Jordan M.), subject line, case number, badge (NEW), and time. Agents can triage before clicking."
+    },
+    {
+      trigger: "Compose area — before sending",
+      question: "Why does ACE have templates at all? What's the risk if every agent writes their own reply from scratch?",
+      context: "Templates ensure consistency, correct signature ('Your Support Team'), and save time. Without them, agents might miss the sign-off, use wrong tone, or forget required info. Templates also auto-fill customer name and case number."
+    },
+    {
+      trigger: "After reply sent — setting status",
+      question: "Jordan's issue is resolved and Alex has sent the reply. Should the status be Pending or Solved — and why?",
+      context: "Solved = issue resolved, not expecting a reply back from the customer. Pending = waiting for the customer to respond with information you asked for. Jordan doesn't need to reply, so: Solved."
+    }
+  ],
+  // Step 3: Live Chat
+  [
+    {
+      trigger: "Chat opened — customer message visible",
+      question: "Sam needs MFA unlinked. Before Alex types anything — where would you look in ACE for the fastest way to do this?",
+      context: "MFA Quick Text button in the right-side Chat Actions panel. One click — it sends the unlink action and auto-fills the correct message. No manual typing needed."
+    },
+    {
+      trigger: "After MFA unlinked",
+      question: "Sam says 'Can you send me a screenshot of the MFA setup guide?' Can Alex do that right now, in this chat?",
+      context: "No. Agents CANNOT send attachments through chat. Customers can send attachments to agents, but not the other way around. If a file is needed, Alex must follow up via email."
+    },
+    {
+      trigger: "Ready to close chat",
+      question: "Before Alex clicks End Chat — what does the CSAT survey situation look like? Does Alex need to send a Quick Text to trigger it?",
+      context: "No — agents are no longer required to send CSAT Survey Quick Text before ending a chat. The survey goes out automatically once the case is complete. One less step."
+    }
+  ],
+  // Step 4: Fraud Escalation
+  [
+    {
+      trigger: "Fraud case in case list",
+      question: "Before opening this case — the row says 'Fraud Suspension — Account Takeover' in the case meta. Which escalation tier does that point to immediately?",
+      context: "Account Takeover → Tier 7 (Fraud). This should be a reflex. ATO and Identity Theft = Tier 7. Chargebacks / ACH Returns = Tier 9. Standard issues = Tier 4."
+    },
+    {
+      trigger: "Inside case — suspension details visible",
+      question: "What are the two scenarios where you'd transfer a live chat to a fraud agent? What's the requirement for the transfer to work?",
+      context: "ATO (Account Takeover) and Identity Theft both qualify for live chat transfer to Tier 7. For the transfer to work, there must be at least one available agent in Tier 7 — if there are none, the transfer won't go through."
+    },
+    {
+      trigger: "Internal note field",
+      question: "What needs to go in this internal post before escalating? What does the fraud team actually need to see when they receive this case?",
+      context: "Suspension reason (Account Takeover), what the customer described, account status (Suspended), any relevant case numbers or context. Always be detailed — the receiving team has no other context."
+    }
+  ],
+  // Step 5: Bonus Bet
+  [
+    {
+      trigger: "Case opened — bonus bet panel visible",
+      question: "There are three columns visible on this screen. Where exactly is the Bonus Bet component — and what conditions must be true for it to appear?",
+      context: "Left panel, below Case Details. The component only shows when: (1) the case is NOT Solved or Closed, and (2) the state is NOT Ontario. If you don't see it, check the case status first."
+    },
+    {
+      trigger: "Product selector showing",
+      question: "This is a Sportsbook case. What do you enter in the Bet ID field if the customer didn't provide one and there's no Promo ID in CPP either?",
+      context: "Enter 'OTC - Tech Issue' or 'OTC - Credit Request' in the Bet ID field. Bet ID is required for all Sportsbook labels except Refer a Friend. Never leave it blank."
+    },
+    {
+      trigger: "Confirmation screen showing",
+      question: "Why is there a confirmation screen before the bonus bet applies? What's it protecting against?",
+      context: "An extra step to prevent accidental application to the wrong account or with the wrong Bet ID. Once applied, it auto-logs in AdminWeb on the customer's profile — it's a real action, not reversible in the same step."
+    }
+  ],
+  // Step 6: Alley-Oop
+  [
+    {
+      trigger: "Parlay case opened",
+      question: "Alex gets this case and isn't sure what to do. Walk me through the options Alex has right now — from fastest to slowest.",
+      context: "1. Check the knowledge base / policy articles (fastest, self-serve). 2. Use Alley-Oop for real-time specialist help. 3. Set case to Pending and research before replying. Never guess."
+    },
+    {
+      trigger: "Alley-Oop panel open",
+      question: "What's the session rule for Alley-Oop? Can Alex have two sessions open at once if there are two tricky cases?",
+      context: "Only ONE messaging session at a time. Cannot combine multiple issues or cases in a single session. Monitor sessions closely and end them once resolved."
+    },
+    {
+      trigger: "No specialist available message",
+      question: "It's been 3 minutes and no specialist connected. What are the exact steps Alex should take right now — step by step?",
+      context: "1. End the Alley-Oop session. 2. Notify the customer of follow-up via email (send a holding reply). 3. Place the case On Hold. 4. Re-escalate when a specialist becomes available. Never leave the customer without a response."
+    }
+  ],
+  // Step 7: End of Shift
+  [
+    {
+      trigger: "5pm shift end screen",
+      question: "What do you think actually happens on the Client side if an agent closes their laptop without setting End of Shift — and leaves themselves on Available - All Channels?",
+      context: "Cases keep routing to that agent all evening. Customers get no response. The agent's queue becomes a 'ghost queue'. Next-day metrics take a hit, and supervisors have to manually reassign work."
+    },
+    {
+      trigger: "Omni-Channel dropdown open at end of shift",
+      question: "Is 'Break' or 'Personal' good enough to use at the end of your shift instead of 'End of Shift'? What's the difference in practice?",
+      context: "No — Break and Personal are non-routing away statuses, but they signal to supervisors that you'll be back. End of Shift flags that you've clocked off for the day. It's the correct and expected status at close of shift."
+    }
+  ]
+];
+
+// ── FACILITATOR FUNCTIONS ─────────────────────────
+function toggleFacilitatorMode() {
+  var btn = document.getElementById('fac-toggle-btn');
+  var panel = document.getElementById('fac-panel');
+
+  // Turning OFF — no PIN needed
+  if(G.facilitatorMode) {
+    G.facilitatorMode = false;
+    G.presentationMode = false;
+    btn.textContent = '🎓 TRAINER MODE';
+    btn.classList.remove('on');
+    panel.classList.remove('open');
+    document.body.classList.remove('trainer-presentation');
+    refreshDiscussionPrompt();
+    return;
+  }
+
+  // Turning ON — show PIN overlay
+  showPinOverlay(function() {
+    G.facilitatorMode = true;
+    btn.textContent = '🎓 TRAINER MODE ON';
+    btn.classList.add('on');
+    panel.classList.add('open');
+    updateFacilitatorPanel(G.scenario);
+    refreshDiscussionPrompt();
+  });
+}
+
+function togglePresentationMode() {
+  G.presentationMode = !G.presentationMode;
+  document.body.classList.toggle('trainer-presentation', G.presentationMode);
+  // Re-render panel to update button state
+  updateFacilitatorPanel(G.scenario);
+  // Re-open panel if it somehow closed
+  if(G.facilitatorMode) {
+    document.getElementById('fac-panel').classList.add('open');
+  }
+}
+
+function refreshDiscussionPrompt() {
+  if(document.getElementById('scenario-intro').style.display !== 'none') {
+    var dp = document.getElementById('s-discussion');
+    if(dp) {
+      var fd = FACILITATOR_DATA[G.scenario];
+      if(G.facilitatorMode && fd && fd.discussionQ) {
+        dp.innerHTML = '<div class="discussion-prompt"><div class="discussion-prompt-label">💬 Ask the Class First</div><div class="discussion-prompt-q">'+fd.discussionQ+'</div></div>';
+        dp.style.display = 'block';
+      } else {
+        dp.style.display = 'none';
+      }
+    }
+  }
+}
+
+function showPinOverlay(onSuccess) {
+  var overlay = document.createElement('div');
+  overlay.id = 'pin-overlay';
+  overlay.innerHTML =
+    '<div id="pin-box">'
+    +'<div id="pin-icon">🔐</div>'
+    +'<div id="pin-title">Trainer Mode</div>'
+    +'<div id="pin-subtitle">Enter your trainer PIN to continue</div>'
+    +'<input id="pin-input" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" />'
+    +'<div id="pin-error" style="display:none;">Incorrect PIN — try again</div>'
+    +'<div id="pin-btns">'
+    +'<button class="pin-btn cancel" onclick="document.getElementById(\'pin-overlay\').remove()">Cancel</button>'
+    +'<button class="pin-btn confirm" onclick="checkPin()">Unlock</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(overlay);
+
+  var input = document.getElementById('pin-input');
+  input.focus();
+  input.addEventListener('keydown', function(e){ if(e.key==='Enter') checkPin(); });
+
+  window._pinSuccess = onSuccess;
+}
+
+function checkPin() {
+  var val = document.getElementById('pin-input').value;
+  if(val === '8686') {
+    document.getElementById('pin-overlay').remove();
+    window._pinSuccess && window._pinSuccess();
+    window._pinSuccess = null;
+  } else {
+    var err = document.getElementById('pin-error');
+    var inp = document.getElementById('pin-input');
+    err.style.display = 'block';
+    inp.value = '';
+    inp.classList.add('pin-shake');
+    setTimeout(function(){ inp.classList.remove('pin-shake'); inp.focus(); }, 500);
+  }
+}
+
+function updateFacilitatorPanel(idx) {
+  if(!G.facilitatorMode) return;
+  var data = FACILITATOR_DATA[idx];
+  var s = SCENARIOS[idx];
+  if(!data || !s) return;
+  var presOn = document.body.classList.contains('trainer-presentation');
+  var pausePoints = PAUSE_DATA[idx] || [];
+  var previewSlides = buildSlidesForScenario(idx);
+  document.getElementById('fac-panel').innerHTML =
+    '<div class="fac-header">'
+    +'<div class="fac-header-title">TRAINER<br>NOTES</div>'
+    +'<button class="fac-pres-btn" onclick="togglePresentationMode()" title="Toggle presentation layout" style="background:'+(presOn?'rgba(255,220,46,.25)':'rgba(255,255,255,.1)')+';border:1px solid '+(presOn?'#FFDC2E':'rgba(255,255,255,.2)')+';color:'+(presOn?'#FFDC2E':'rgba(255,255,255,.7)')+';border-radius:5px;padding:3px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:6px;white-space:nowrap;">'+(presOn?'📽️ ON':'📽️ PRESENT')+'</button>'
+    +'<button class="fac-close" onclick="toggleFacilitatorMode()">✕</button>'
+    +'</div>'
+    +'<div class="fac-scenario-strip">'
+    +'<div class="fac-scenario-act">'+s.act+'</div>'
+    +'<div class="fac-scenario-title">'+s.title+'</div>'
+    +'</div>'
+    // ── SLIDE DECK BUTTON (primary) ──
+    +'<div class="fac-slides-section">'
+    +'<button class="fac-slides-btn" onclick="openSlides('+idx+')">📊 OPEN SLIDE DECK</button>'
+    +'<div class="fac-slides-hint">'+previewSlides.length+' slides  ·  ← → arrows to navigate  ·  ESC to close</div>'
+    +'</div>'
+    // ── PAUSE BUTTON ──
+    +(pausePoints.length ? (
+      '<div class="fac-pause-section">'
+      +'<button class="fac-pause-btn" onclick="G.pausePoint=0;showPause('+idx+')">⏸ PAUSE FOR DISCUSSION</button>'
+      +'<div class="fac-pause-hint">'+pausePoints.length+' discussion point'+(pausePoints.length>1?'s':'')+'  ·  Press <b>P</b> to toggle</div>'
+      +'</div>'
+    ) : '')
+    +'<div class="fac-section">'
+    +'<div class="fac-section-label yellow">🎯 Talking Points</div>'
+    + data.notes.map(function(n){ return '<div class="fac-point">'+n+'</div>'; }).join('')
+    +'</div>'
+    +'<div class="fac-section">'
+    +'<div class="fac-section-label red">⚠️ Common Mistakes</div>'
+    + data.mistakes.map(function(m){ return '<div class="fac-mistake">'+m+'</div>'; }).join('')
+    +'</div>'
+    +'<div class="fac-section">'
+    +'<div class="fac-section-label blue">👁️ Watch For</div>'
+    +'<div class="fac-watch">'+data.watchFor+'</div>'
+    +'</div>';
+}
+
+// ── PAUSE + DISCUSSION ────────────────────────────
+function showPause(idx) {
+  idx = (idx === undefined) ? G.scenario : idx;
+  var points = PAUSE_DATA[idx];
+  if(!points || !points.length) return;
+  G.pausePoint = G.pausePoint % points.length;
+  var pt = points[G.pausePoint];
+  var total = points.length;
+  var current = G.pausePoint + 1;
+
+  // Build dots
+  var dots = '';
+  for(var i=0;i<total;i++){
+    dots += '<div class="pause-dot'+(i===G.pausePoint?' active':'')+'"></div>';
+  }
+
+  var overlay = document.getElementById('pause-overlay');
+  var isNew = !overlay;
+  if(isNew){
+    overlay = document.createElement('div');
+    overlay.id = 'pause-overlay';
+    overlay.className = 'pause-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  overlay.innerHTML =
+    '<div class="pause-card">'
+    +'<div class="pause-header">'
+    +'<div class="pause-label">⏸ DISCUSSION PAUSE</div>'
+    +'<div class="pause-step">'+current+' / '+total+'</div>'
+    +'</div>'
+    +'<div class="pause-trigger">'+pt.trigger+'</div>'
+    +'<div class="pause-question">'+pt.question+'</div>'
+    +(pt.context ? '<div class="pause-context"><div class="pause-context-label">🎓 Instructor context</div>'+pt.context+'</div>' : '')
+    +'<div class="pause-footer">'
+    +'<button class="pause-resume" onclick="closePause()">▶ Resume</button>'
+    +(total > 1 ? '<button class="pause-next" onclick="advancePause('+idx+')">Next point ›</button>' : '')
+    +'</div>'
+    +'<div class="pause-dots" style="justify-content:center;margin-top:12px;">'+dots+'</div>'
+    +'</div>';
+
+  overlay.style.display = 'flex';
+}
+
+function advancePause(idx) {
+  var points = PAUSE_DATA[idx];
+  if(!points) return;
+  G.pausePoint = (G.pausePoint + 1) % points.length;
+  showPause(idx);
+}
+
+function closePause() {
+  var overlay = document.getElementById('pause-overlay');
+  if(overlay) overlay.remove();
+  G.pausePoint = 0;
+}
+
+// Keyboard shortcut: P key triggers pause when facilitator mode is active
+document.addEventListener('keydown', function(e){
+  if(!G.facilitatorMode) return;
+  if(e.key === 'p' || e.key === 'P'){
+    if(document.activeElement && (document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')) return;
+    var existing = document.getElementById('pause-overlay');
+    if(existing){ closePause(); } else { showPause(G.scenario); }
+  }
+});
+
+function showDebrief(completedIdx, nextFn) {
+  var data = DEBRIEF_DATA[completedIdx];
+  if(!data) { nextFn(); return; }
+  var overlay = document.createElement('div');
+  overlay.className = 'debrief-overlay';
+  overlay.id = 'debrief-overlay';
+  overlay.innerHTML =
+    '<div class="debrief-card">'
+    +'<div class="debrief-header"><div class="debrief-emoji">📋</div>'
+    +'<div class="debrief-title">CLASS DEBRIEF<br>'+data.title.toUpperCase()+'</div></div>'
+    +'<div class="debrief-points">'
+    + data.points.map(function(p){ return '<div class="debrief-point">'+p+'</div>'; }).join('')
+    +'</div>'
+    +'<div class="debrief-q-box">'
+    +'<div class="debrief-q-label">💬 Ask the Class</div>'
+    +'<div class="debrief-q-text">'+data.question+'</div>'
+    +'</div>'
+    +'<button class="debrief-continue" id="debrief-btn">Continue ▶</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('debrief-btn').onclick = function() {
+    overlay.remove();
+    nextFn();
+  };
+}
+
+// Helper: wrap a nextFn with a debrief when facilitator mode is on
+function maybeDebrief(completedIdx, nextFn) {
+  return function() {
+    if(G.facilitatorMode) {
+      showDebrief(completedIdx, nextFn);
+    } else {
+      nextFn();
+    }
+  };
+}
+
+// ── SLIDE DECK ────────────────────────────────────
+var G_slides = { idx: 0, slides: [], open: false, simMode: false };
+
+function buildSlidesForScenario(scenarioIdx) {
+  var s = SCENARIOS[scenarioIdx];
+  var fd = FACILITATOR_DATA[scenarioIdx];
+  var slides = [];
+
+  // 1. INTRO slide
+  slides.push({ type: 'intro', emoji: s.emoji, act: s.act, title: s.title, desc: s.desc });
+
+  // 2. KEY POINT slides (one per note)
+  fd.notes.forEach(function(note, i) {
+    slides.push({ type: 'point', text: note, num: i + 1, total: fd.notes.length });
+  });
+
+  // 3. COMMON MISTAKE slides (one per mistake)
+  fd.mistakes.forEach(function(mistake, i) {
+    slides.push({ type: 'mistake', text: mistake, num: i + 1, total: fd.mistakes.length });
+  });
+
+  // 4. WATCH FOR slide
+  slides.push({ type: 'watch', text: fd.watchFor });
+
+  // 5. DISCUSSION QUESTION slide
+  slides.push({ type: 'discussion', text: fd.discussionQ });
+
+  return slides;
+}
+
+function renderSlideContent(slide, idx, total) {
+  var html = '';
+  if(slide.type === 'intro') {
+    html =
+      '<div class="slide-chip chip-intro">📋 SCENARIO INTRO</div>'
+      +'<span class="slide-emoji">'+slide.emoji+'</span>'
+      +'<div class="slide-act">'+slide.act+'</div>'
+      +'<div class="slide-title">'+slide.title+'</div>'
+      +'<div class="slide-desc">'+slide.desc+'</div>';
+  } else if(slide.type === 'point') {
+    html =
+      '<div class="slide-chip chip-point">🎯 TALKING POINT '+(slide.num)+' OF '+(slide.total)+'</div>'
+      +'<div class="slide-point-text">'+slide.text+'</div>';
+  } else if(slide.type === 'mistake') {
+    html =
+      '<div class="slide-chip chip-mistake">⚠️ COMMON MISTAKE '+(slide.num)+' OF '+(slide.total)+'</div>'
+      +'<span class="slide-mistake-icon">✕</span>'
+      +'<div class="slide-mistake-text">'+slide.text+'</div>';
+  } else if(slide.type === 'watch') {
+    html =
+      '<div class="slide-chip chip-watch">👁️ WATCH FOR</div>'
+      +'<div class="slide-watch-text">"'+slide.text+'"</div>';
+  } else if(slide.type === 'discussion') {
+    html =
+      '<div class="slide-chip chip-discussion">💬 ASK THE CLASS</div>'
+      +'<div class="slide-discussion-q">'+slide.text+'</div>'
+      +'<div class="slide-discussion-hint">Allow 2–3 minutes for discussion before continuing</div>';
+  }
+  return html;
+}
+
+function renderSlideDots(total, current) {
+  var html = '';
+  for(var i = 0; i < total; i++) {
+    var cls = i < current ? 'slides-dot visited' : (i === current ? 'slides-dot active' : 'slides-dot');
+    html += '<div class="'+cls+'"></div>';
+  }
+  return '<div class="slides-dots">'+html+'</div>';
+}
+
+function openSlides(scenarioIdx) {
+  scenarioIdx = (scenarioIdx === undefined) ? G.scenario : scenarioIdx;
+  G_slides.idx = 0;
+  G_slides.slides = buildSlidesForScenario(scenarioIdx);
+  G_slides.open = true;
+  G_slides.simMode = false;
+
+  var overlay = document.getElementById('slides-overlay');
+  var isNew = !overlay;
+  if(isNew) {
+    overlay = document.createElement('div');
+    overlay.id = 'slides-overlay';
+    document.body.appendChild(overlay);
+
+    // Back-to-slides floating button
+    var backBtn = document.createElement('button');
+    backBtn.id = 'back-to-slides-btn';
+    backBtn.textContent = '📊 Back to Slides';
+    backBtn.onclick = function(){ toggleSimMode(false); };
+    document.body.appendChild(backBtn);
+  }
+  overlay.className = '';
+  renderSlides(scenarioIdx);
+  overlay.style.display = 'flex';
+  overlay.style.flexDirection = 'column';
+}
+
+function renderSlides(scenarioIdx) {
+  scenarioIdx = (scenarioIdx === undefined) ? G.scenario : scenarioIdx;
+  var overlay = document.getElementById('slides-overlay');
+  if(!overlay) return;
+  var slides = G_slides.slides;
+  var idx = G_slides.idx;
+  var s = SCENARIOS[scenarioIdx];
+
+  overlay.innerHTML =
+    // Top bar
+    '<div class="slides-topbar">'
+    +'<div class="slides-scenario-label">'+s.act+' — '+s.title+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<button class="slides-show-sim" onclick="toggleSimMode(true)">⚡ Show Sim</button>'
+    +'<button class="slides-close-btn" onclick="closeSlides()" title="Close slide deck">✕</button>'
+    +'</div>'
+    +'</div>'
+
+    // Slide stage
+    +'<div class="slides-stage">'
+    +'<div class="slide" id="slide-content">'+renderSlideContent(slides[idx], idx, slides.length)+'</div>'
+    +'</div>'
+
+    // Navigation
+    +'<div class="slides-nav">'
+    +'<button class="slide-nav-btn" onclick="navSlide(-1)" '+(idx === 0 ? 'disabled' : '')+'>‹</button>'
+    +renderSlideDots(slides.length, idx)
+    +'<div class="slides-counter">'+(idx+1)+' / '+slides.length+'</div>'
+    +'<button class="slide-nav-btn" onclick="navSlide(1)" '+(idx === slides.length-1 ? 'disabled' : '')+'>›</button>'
+    +'</div>';
+}
+
+function navSlide(dir) {
+  var slides = G_slides.slides;
+  var next = G_slides.idx + dir;
+  if(next < 0 || next >= slides.length) return;
+  G_slides.idx = next;
+  renderSlides();
+}
+
+function toggleSimMode(showSim) {
+  var overlay = document.getElementById('slides-overlay');
+  var backBtn = document.getElementById('back-to-slides-btn');
+  if(!overlay) return;
+  G_slides.simMode = showSim;
+  if(showSim) {
+    overlay.classList.add('sim-mode');
+    if(backBtn) backBtn.style.display = 'block';
+  } else {
+    overlay.classList.remove('sim-mode');
+    if(backBtn) backBtn.style.display = 'none';
+    renderSlides(); // Re-render in case scenario changed
+  }
+}
+
+function closeSlides() {
+  var overlay = document.getElementById('slides-overlay');
+  var backBtn = document.getElementById('back-to-slides-btn');
+  if(overlay) { overlay.style.display = 'none'; }
+  if(backBtn) { backBtn.style.display = 'none'; }
+  G_slides.open = false;
+  G_slides.simMode = false;
+}
+
+// Keyboard navigation for slides
+document.addEventListener('keydown', function(e) {
+  if(!G_slides.open || G_slides.simMode) return;
+  if(e.key === 'ArrowRight' || e.key === 'ArrowDown') navSlide(1);
+  if(e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navSlide(-1);
+  if(e.key === 'Escape') closeSlides();
+});
+
+// ── BOOT ──────────────────────────────────────────
+showScenarioMenu();
+</script>
+</body>
+</html>
