@@ -2,6 +2,13 @@
 
 This is a static portfolio site. The public entry point is `index.html`.
 
+## Live URLs
+
+- GitHub: https://github.com/jasonclawc/jcoldren-work
+- Vercel: https://jcoldren-work.vercel.app/
+- Cloudflare Pages: https://jcoldren-work.pages.dev/
+- Custom domain: https://jcoldren.work/
+
 ## GitHub
 
 After signing in with GitHub CLI:
