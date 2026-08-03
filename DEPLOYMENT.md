@@ -33,7 +33,7 @@ After signing in with Cloudflare:
 npm run deploy:cloudflare
 ```
 
-The Cloudflare deployment uses `_worker.js` to password-protect the site. Set these Pages secrets before deploying:
+The Cloudflare deployment uses `_worker.js` and `_routes.json` to password-protect every route on the site. Set these Pages secrets before deploying:
 
 ```sh
 wrangler pages secret put PORTFOLIO_PASSWORD --project-name jcoldren-work
