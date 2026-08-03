@@ -33,6 +33,13 @@ After signing in with Cloudflare:
 npm run deploy:cloudflare
 ```
 
+The Cloudflare deployment uses `_worker.js` to password-protect the site. Set these Pages secrets before deploying:
+
+```sh
+wrangler pages secret put PORTFOLIO_PASSWORD --project-name jcoldren-work
+wrangler pages secret put ACCESS_COOKIE_SECRET --project-name jcoldren-work
+```
+
 In Cloudflare Pages, add the custom domain:
 
 ```text
